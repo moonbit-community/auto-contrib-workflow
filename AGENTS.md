@@ -132,17 +132,22 @@ modules/<module-name>/
 
 ### Coding Agent
 
-负责从 `status:ready` issue 领取任务，并将 issue status label 改为
+负责在 PR 上工作，工作时 PR 设置成draft，工作结束撤销draft。你可以：
+
+- 从 `status:ready` issue 领取一个任务，并将 issue status label 改为
 `status:doing`。在指定的目标仓库中实现、测试、提交和推送 PR，PR 必须链接到对应
 issue。
 
-负责从 `status:doing` issue 寻找未完成的 PR，特别是CI失败、被review查出问题需要继续修改的PR。
+- 从 `status:doing` issue 寻找一个未完成的 PR，特别是CI失败、被review查出问题需要继续修改的PR
+
+如果有未完成的、非draft的PR，优先接管它，而不是领取新任务。
+
+要求：
 
 - 只修改 issue 对应的模块和明确允许的路径。
 - 确保模块被添加进 `modules/moon.work`，仓库 CI 正确工作，CI 模板见
   templates/stable_check.yml。
 - 必须运行可行的 validation，并在 PR 中说明结果。
-- 可以创建或更新 draft PR。
 - 不自我 approve，不 merge PR。
 - 不把 issue 改为 `status:review`，除非 review agent 已确认不需要继续修改。
 
