@@ -111,16 +111,20 @@ pub fn pattern(glob : Glob) -> String {
 ///|
 /// Returns true when the compiled glob matches the whole path.
 ///
-/// Both patterns and candidate paths normalize `\` to `/` before matching.
+/// Candidate paths normalize `\` to `/` before matching. Leading, repeated,
+/// or trailing separators create empty path segments and do not match.
 pub fn matches(glob : Glob, path : String) -> Bool {
   let segments = split_path(path)
-  match_segments(glob.segments, 0, segments, 0)
+  !has_empty_segment(segments) && match_segments(glob.segments, 0, segments, 0)
 }
 
 ///|
 /// Returns true when any glob in the set matches the whole path.
 pub fn matches_any(set : GlobSet, path : String) -> Bool {
   let segments = split_path(path)
+  if has_empty_segment(segments) {
+    return false
+  }
   let mut index = 0
   while index < set.globs.length() {
     if match_segments(set.globs[index].segments, 0, segments, 0) {
@@ -136,6 +140,9 @@ pub fn matches_any(set : GlobSet, path : String) -> Bool {
 pub fn matched_ids(set : GlobSet, path : String) -> Array[Int] {
   let segments = split_path(path)
   let ids : Array[Int] = []
+  if has_empty_segment(segments) {
+    return ids
+  }
   let mut index = 0
   while index < set.globs.length() {
     if match_segments(set.globs[index].segments, 0, segments, 0) {
@@ -334,14 +341,22 @@ fn split_path(path : String) -> Array[Array[Byte]] {
   let mut index = 0
   while index <= bytes.length() {
     if index == bytes.length() || byte_is(bytes[index], 47) {
-      if index > start {
-        segments.push(slice_bytes(bytes, start, index))
-      }
+      segments.push(slice_bytes(bytes, start, index))
       start = index + 1
     }
     index += 1
   }
   segments
+}
+
+///|
+fn has_empty_segment(segments : Array[Array[Byte]]) -> Bool {
+  for segment in segments {
+    if segment.length() == 0 {
+      return true
+    }
+  }
+  false
 }
 
 ///|

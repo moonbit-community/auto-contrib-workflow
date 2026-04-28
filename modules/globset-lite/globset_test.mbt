@@ -62,6 +62,17 @@ test "pattern text stores normalized separators" {
 }
 
 ///|
+test "candidate paths keep empty segments significant" {
+  let glob = try! @globset_lite.compile("src/*.mbt")
+  @debug.assert_eq(@globset_lite.matches(glob, "/src/main.mbt"), false)
+  @debug.assert_eq(@globset_lite.matches(glob, "src//main.mbt"), false)
+  @debug.assert_eq(@globset_lite.matches(glob, "src/main.mbt/"), false)
+  let set = try! @globset_lite.compile_set(["src/*.mbt", "src/**"])
+  @debug.assert_eq(@globset_lite.matches_any(set, "src//main.mbt"), false)
+  @debug.assert_eq(@globset_lite.matched_ids(set, "src/main.mbt/"), [])
+}
+
+///|
 test "compile reports parse errors" {
   let empty : Result[@globset_lite.Glob, @globset_lite.GlobError] = try? @globset_lite.compile(
     "",

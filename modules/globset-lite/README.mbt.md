@@ -26,4 +26,5 @@ test "glob set example" {
 
 Supported syntax is deliberately small: `*`, `?`, `**` as a full path segment,
 and character classes such as `[abc]`, `[a-z]`, and `[!0-9]`. Both patterns and
-candidate paths normalize `\` to `/` before matching.
+candidate paths normalize `\` to `/` before matching. Candidate paths with
+leading, repeated, or trailing separators do not match.
