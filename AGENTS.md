@@ -124,7 +124,7 @@ Work on PRs. Set PRs to draft while working, mark them ready when finished, and 
 
 - Pick up one `status:ready` issue and move its issue status label to `status:doing`. Implement, test, commit, and push a PR in the specified target repository. The PR must link to the corresponding issue.
 
-- Find an unfinished task from a `status:doing` issue or a PR labeled `require changes`, then update the code and PR description according to review feedback, including PR comments and inline code comments. If human feedback conflicts with the issue task plan, human feedback takes precedence. Unfinished tasks usually include:
+- Find an unfinished task from either a `status:doing` issue or any PR with the `require changes` label, then update the code and PR description according to review feedback, including PR comments and inline code comments. If human feedback conflicts with the issue task plan, human feedback takes precedence. Unfinished tasks usually include:
 
   - PRs with failing CI.
   - PRs with branch conflicts that must be resolved, or PRs that need a rebase.
