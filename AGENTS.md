@@ -46,16 +46,15 @@ Do not create local queue directories such as `ideas/`, `tasks/`, or `reports/`.
 
 Labels available on issues:
 
-- status labels:
-  - `status:inbox`: New ideas, reports, or untriaged items.
-  - `status:ready`: Accepted, clearly scoped, or ready to assign to an agent.
-  - `status:doing`: Requires agent work, including implementation, agent review, or validation.
-  - `status:review`: All agent work is complete and the item is waiting for final human review.
-  - `status:rejected`: Rejected idea, used to prevent agents from generating the same idea again later.
+  - status labels:
+    - `status:inbox`: New ideas, reports, or untriaged items.
+    - `status:ready`: Accepted, clearly scoped, or ready to assign to an agent.
+    - `status:doing`: Requires agent work, including implementation, agent review, or validation.
+    - `status:review`: All agent work is complete and the item is waiting for final human review.
+    - `status:rejected`: Rejected idea, used to prevent agents from generating the same idea again later.
 
 Labels available on PRs:
-
-- `require changes`
+  - `require changes`
 
 An open queue issue may have only one `status:*` label at a time.
 
@@ -111,10 +110,10 @@ Discover and organize 10 candidate requirements for MoonBit ecosystem libraries 
     - https://pkg.go.dev/
     - https://central.sonatype.com
     - https://www.nuget.org/
-- Requirements must not be low-quality busywork:
-  - Based on MoonBit's development status, they must not duplicate directions already present at https://mooncakes.io/api/v0/modules.
-  - They must not duplicate this repository's existing open or closed issues.
-  - They must not duplicate closed issues labeled `status:rejected`.
+- Requirements must not be low-value busywork:
+   - Based on MoonBit's development status, they must not duplicate directions already present at https://mooncakes.io/api/v0/modules.
+   - They must not duplicate this repository's existing open or closed issues.
+   - They must not duplicate closed issues labeled `status:rejected`.
 - Do not write code in target repositories.
 - Do not review or approve PRs.
 - Do not modify existing issue status labels unless the user explicitly requests it.
@@ -145,7 +144,7 @@ Requirements:
 
 ### Review Agent
 
-Find PRs in the repository that correspond to `status:doing` issues and are not draft PRs. Review them strictly. If a PR has problems, post review feedback to the corresponding PR. If a PR has no problems, update the status tag to `status:review`.
+Find PRs in the repository that correspond to `status:doing` issues and are not draft PRs. Review them strictly. If a PR has problems, post review feedback to the corresponding PR. If a PR has no problems, update the status label to `status:review`.
 
 Do not save review copies in this workflow repository. Prioritize correctness, scope control, test quality, and maintainability.
 
@@ -193,6 +192,7 @@ Requirements:
 - If changes, additional tests, or re-validation are still needed, keep the issue at `status:doing`.
 - If implementation, agent review, required changes, and validation are all complete, the issue may be moved from `status:doing` to `status:review`.
 - Do not merge PRs and do not close issues unless the user explicitly requests it or the corresponding work has been completed or merged.
+
 
 ## Common Anti-patterns In MoonBit
 
