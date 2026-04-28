@@ -1,0 +1,326 @@
+///|
+import {
+  "moonbitlang/core/env" @env,
+  "moonbitlang/core/string" @str,
+  "moonbitlang/async@0.18.0",
+  "moonbitlang/async@0.18.0/fs",
+  "moonbitlang/async@0.18.0/process",
+}
+
+///|
+let repo_name : String = "Yoorkin/auto-contrib-workflow"
+
+///|
+let discover_minute_of_day : Int = 8 * 60
+
+///|
+let default_cycle_interval_ms : Int = 1000
+
+///|
+let default_poll_interval_ms : Int = 60 * 1000
+
+///|
+fn usage() -> String {
+  "Usage:\n  moon run agents.mbtx"
+}
+
+///|
+fn prompt_for(role : String) -> String {
+  match role {
+    "coding" =>
+      "You are the Coding Agent for \{repo_name}. Follow AGENTS.md strictly."
+    "review" =>
+      "You are the Review Agent for \{repo_name}. Follow AGENTS.md strictly."
+    "discover" =>
+      "You are the Discovery Agent for \{repo_name}. Follow AGENTS.md strictly."
+    _ => abort("unknown role: \{role}")
+  }
+}
+
+///|
+async fn command_output(command : String, args : Array[String]) -> String {
+  let (code, stdout, stderr) = @process.collect_output(command, args)
+  if code != 0 {
+    abort(
+      "command failed: \{command} \{args}\nstdout:\n\{stdout.text()}\nstderr:\n\{stderr.text()}",
+    )
+  }
+  stdout.text().trim(char_set="\n\r ").to_owned()
+}
+
+///|
+async fn repo_root() -> String {
+  match @env.get_env_var("AUTO_CONTRIB_WORKFLOW_REPO") {
+    Some(path) => path
+    None => command_output("git", ["rev-parse", "--show-toplevel"])
+  }
+}
+
+///|
+async fn date_part(format : String) -> String {
+  command_output("date", [format])
+}
+
+///|
+async fn today() -> String {
+  date_part("+%F")
+}
+
+///|
+async fn timestamp() -> String {
+  date_part("+%Y-%m-%d %H:%M:%S %z")
+}
+
+///|
+async fn log_stamp() -> String {
+  date_part("+%Y-%m-%d-%H%M")
+}
+
+///|
+async fn now_seconds() -> Int {
+  @str.parse_int(date_part("+%s"))
+}
+
+///|
+async fn minutes_since_midnight() -> Int {
+  let hour = @str.parse_int(date_part("+%H"))
+  let minute = @str.parse_int(date_part("+%M"))
+  hour * 60 + minute
+}
+
+///|
+fn initial_cycle_role() -> String {
+  "review"
+}
+
+///|
+fn next_cycle_role(role : String) -> String {
+  if role == "coding" {
+    "review"
+  } else {
+    "coding"
+  }
+}
+
+///|
+fn optional_int_env(name : String) -> Int? {
+  match @env.get_env_var(name) {
+    Some(value) => Some(@str.parse_int(value) catch {
+      _ => abort("invalid integer environment variable: \{name}")
+    })
+    None => None
+  }
+}
+
+///|
+fn int_env(name : String, default_value : Int) -> Int {
+  match optional_int_env(name) {
+    Some(value) if value > 0 => value
+    _ => default_value
+  }
+}
+
+///|
+fn should_stop(run_count : Int, max_runs : Int?) -> Bool {
+  match max_runs {
+    Some(max) => run_count >= max
+    None => false
+  }
+}
+
+///|
+async fn append_log(path : String, message : String) -> Unit {
+  @fs.write_file(path, message, append=true, create=0o644, truncate=false)
+}
+
+///|
+async fn ensure_logs_dir(root : String) -> String {
+  let logs_dir = root + "/logs"
+  if !@fs.exists(logs_dir) {
+    @fs.mkdir(logs_dir, permission=0o755, recursive=true)
+  }
+  logs_dir
+}
+
+///|
+async fn run_role(root : String, role : String) -> Bool {
+  let logs_dir = ensure_logs_dir(root)
+  let lock = @fs.open(root + "/.agent-run.lock", mode=ReadWrite, create=0o644)
+  defer lock.close()
+  if lock.try_lock(Exclusive) == false {
+    let stamp = log_stamp()
+    append_log(
+      logs_dir + "/" + role + "-" + stamp + ".log",
+      "===== \{timestamp()} skip \{role}: another agent is running =====\n",
+    )
+    println("another agent is running; skipped \{role}")
+    return false
+  }
+
+  let stamp = log_stamp()
+  let log_file = logs_dir + "/" + role + "-" + stamp + ".log"
+  let codex = match @env.get_env_var("CODEX_BIN") {
+    Some(path) => path
+    None => "codex"
+  }
+  let args = [
+    "exec", "-m", "gpt-5.5", "-c", "model_reasoning_effort=\"xhigh\"", "-c",
+    "service_tier=\"fast\"", "-s", "danger-full-access", prompt_for(role),
+  ]
+
+  append_log(
+    log_file,
+    "\n===== \{timestamp()} start \{role} =====\nrepo: \{root}\n",
+  )
+  println("starting \{role}; log: \{log_file}")
+  let output = @process.redirect_to_file(log_file, append=true, create=0o644)
+  let code = @process.run(codex, args, stdout=output, stderr=output, cwd=root)
+  append_log(log_file, "\n===== \{timestamp()} exit \{role}: \{code} =====\n")
+  if code != 0 {
+    println("codex exec failed for \{role}; see \{log_file}")
+    false
+  } else {
+    println("finished \{role}; log: \{log_file}")
+    true
+  }
+}
+
+///|
+async fn initial_discover_date() -> String {
+  if minutes_since_midnight() >= discover_minute_of_day {
+    today()
+  } else {
+    ""
+  }
+}
+
+///|
+async fn maybe_run_discover(
+  root : String,
+  last_discover_date : String
+) -> (String, Bool) {
+  let current_day = today()
+  let current_minute = minutes_since_midnight()
+  if current_minute >= discover_minute_of_day &&
+    last_discover_date != current_day {
+    ignore(run_role(root, "discover"))
+    (current_day, true)
+  } else {
+    (last_discover_date, false)
+  }
+}
+
+///|
+async fn wait_for_next_cycle(
+  root : String,
+  wait_seconds : Int,
+  poll_interval_ms : Int,
+  last_discover_date : String,
+  next_role : String
+) -> (String, Int) {
+  println("waiting \{wait_seconds}s before starting \{next_role}")
+  let deadline = now_seconds() + wait_seconds
+  let mut discover_date = last_discover_date
+  let mut discover_runs = 0
+  while now_seconds() < deadline {
+    let (next_discover_date, ran_discover) = maybe_run_discover(
+      root,
+      discover_date,
+    )
+    discover_date = next_discover_date
+    if ran_discover {
+      discover_runs += 1
+    }
+
+    let remaining_seconds = deadline - now_seconds()
+    if remaining_seconds <= 0 {
+      return (discover_date, discover_runs)
+    }
+    let remaining_ms = remaining_seconds * 1000
+    @async.sleep(
+      if remaining_ms < poll_interval_ms {
+        remaining_ms
+      } else {
+        poll_interval_ms
+      },
+    )
+  }
+  (discover_date, discover_runs)
+}
+
+///|
+async fn run_scheduler() -> Unit {
+  let root = repo_root()
+  ignore(ensure_logs_dir(root))
+  let scheduler_lock = @fs.open(
+    root + "/.agent-scheduler.lock",
+    mode=ReadWrite,
+    create=0o644,
+  )
+  defer scheduler_lock.close()
+  if scheduler_lock.try_lock(Exclusive) == false {
+    abort("another scheduler is already running")
+  }
+
+  let cycle_interval_ms = int_env(
+    "AGENT_CYCLE_INTERVAL_MS",
+    default_cycle_interval_ms,
+  )
+  let poll_interval_ms = int_env(
+    "AGENT_POLL_INTERVAL_MS",
+    default_poll_interval_ms,
+  )
+  let max_runs = optional_int_env("AGENT_SCHEDULER_MAX_RUNS")
+  let cycle_interval_seconds = cycle_interval_ms / 1000
+  let mut next_role = initial_cycle_role()
+  let mut last_discover_date = initial_discover_date()
+  let mut run_count = 0
+
+  println("agent scheduler started in \{root}")
+  while true {
+    let (next_discover_date, ran_discover) = maybe_run_discover(
+      root,
+      last_discover_date,
+    )
+    last_discover_date = next_discover_date
+    if ran_discover {
+      run_count += 1
+      if should_stop(run_count, max_runs) {
+        return
+      }
+    }
+
+    let cycle_started_at = now_seconds()
+    ignore(run_role(root, next_role))
+    next_role = next_cycle_role(next_role)
+    run_count += 1
+    if should_stop(run_count, max_runs) {
+      return
+    }
+
+    let elapsed_seconds = now_seconds() - cycle_started_at
+    let wait_seconds = cycle_interval_seconds - elapsed_seconds
+    if wait_seconds > 0 {
+      let (next_discover_date, discover_runs) = wait_for_next_cycle(
+        root,
+        wait_seconds,
+        poll_interval_ms,
+        last_discover_date,
+        next_role,
+      )
+      last_discover_date = next_discover_date
+      run_count += discover_runs
+      if should_stop(run_count, max_runs) {
+        return
+      }
+    }
+  }
+}
+
+///|
+async fn main {
+  match @env.args() {
+    [_] => run_scheduler()
+    _ => abort(usage())
+  }
+}
