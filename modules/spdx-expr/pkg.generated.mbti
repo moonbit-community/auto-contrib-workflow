@@ -28,10 +28,16 @@ pub(all) suberror ValidationError {
 
 // Types and methods
 pub(all) enum Expr {
-  License(String)
-  With(String, String)
+  Simple(SimpleExpr)
+  With(SimpleExpr, String)
   And(Expr, Expr)
   Or(Expr, Expr)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum SimpleExpr {
+  License(String)
+  LicenseOrLater(String)
+  LicenseRef(String?, String)
 } derive(Eq, @debug.Debug)
 
 // Type aliases

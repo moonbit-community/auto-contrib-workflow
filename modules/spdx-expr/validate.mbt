@@ -28,10 +28,10 @@ fn validate_expr(
   exception_ids : Array[String],
 ) -> Unit raise ValidationError {
   match expr {
-    License(id) => validate_license_id(id, license_ids)
-    With(license_id, exception_id) => {
-      validate_license_id(license_id, license_ids)
-      if !contains_string(exception_ids, exception_id) {
+    Simple(simple) => validate_simple(simple, license_ids)
+    With(simple, exception_id) => {
+      validate_simple(simple, license_ids)
+      if !contains_spdx_id(exception_ids, exception_id) {
         raise UnknownException(exception_id)
       }
     }
@@ -43,20 +43,31 @@ fn validate_expr(
 }
 
 ///|
+fn validate_simple(
+  simple : SimpleExpr,
+  license_ids : Array[String],
+) -> Unit raise ValidationError {
+  match simple {
+    License(id) | LicenseOrLater(id) => validate_license_id(id, license_ids)
+    LicenseRef(_, _) => ()
+  }
+}
+
+///|
 fn validate_license_id(
   license_id : String,
   license_ids : Array[String],
 ) -> Unit raise ValidationError {
-  if !contains_string(license_ids, license_id) {
+  if !contains_spdx_id(license_ids, license_id) {
     raise UnknownLicense(license_id)
   }
 }
 
 ///|
-fn contains_string(values : Array[String], needle : String) -> Bool {
+fn contains_spdx_id(values : Array[String], needle : String) -> Bool {
   let mut found = false
   for value in values {
-    if value == needle {
+    if value.equal_ignore_ascii_case(needle) {
       found = true
     }
   }

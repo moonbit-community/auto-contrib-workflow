@@ -1,24 +1,30 @@
 ///|
 fn common_licenses() -> Array[String] {
-  ["MIT", "Apache-2.0", "BSD-3-Clause", "GPL-2.0-only", "0BSD"]
+  ["MIT", "Apache-2.0", "BSD-3-Clause", "GPL-2.0", "GPL-2.0-only", "0BSD"]
 }
 
 ///|
 fn common_exceptions() -> Array[String] {
-  ["Classpath-exception-2.0", "LLVM-exception"]
+  ["Classpath-exception-2.0", "LLVM-exception", "Bison-exception-2.2"]
 }
 
 ///|
 test "parse and format simple license expression" {
   let expr = try! @spdx_expr.parse("MIT OR Apache-2.0")
-  @debug.assert_eq(expr, Or(License("MIT"), License("Apache-2.0")))
+  @debug.assert_eq(
+    expr,
+    Or(Simple(License("MIT")), Simple(License("Apache-2.0"))),
+  )
   @debug.assert_eq(@spdx_expr.format(expr), "MIT OR Apache-2.0")
 }
 
 ///|
 test "parse SPDX WITH exception" {
   let expr = try! @spdx_expr.parse("GPL-2.0-only WITH Classpath-exception-2.0")
-  @debug.assert_eq(expr, With("GPL-2.0-only", "Classpath-exception-2.0"))
+  @debug.assert_eq(
+    expr,
+    With(License("GPL-2.0-only"), "Classpath-exception-2.0"),
+  )
   try! @spdx_expr.validate(
     expr,
     common_licenses(),
@@ -45,8 +51,51 @@ test "parser respects parentheses and operator precedence" {
   )
   @debug.assert_eq(
     precedence,
-    Or(License("MIT"), And(License("Apache-2.0"), License("BSD-3-Clause"))),
+    Or(
+      Simple(License("MIT")),
+      And(Simple(License("Apache-2.0")), Simple(License("BSD-3-Clause"))),
+    ),
   )
+}
+
+///|
+test "parse SPDX license references" {
+  let local_ref = try! @spdx_expr.parse("LicenseRef-MIT-Style-1")
+  @debug.assert_eq(local_ref, Simple(LicenseRef(None, "MIT-Style-1")))
+  @debug.assert_eq(@spdx_expr.format(local_ref), "LicenseRef-MIT-Style-1")
+  try! @spdx_expr.validate(local_ref, common_licenses())
+
+  let document_ref = try! @spdx_expr.parse(
+    "DocumentRef-spdx-tool-1.2:LicenseRef-MIT-Style-2",
+  )
+  @debug.assert_eq(
+    document_ref,
+    Simple(LicenseRef(Some("spdx-tool-1.2"), "MIT-Style-2")),
+  )
+  @debug.assert_eq(
+    @spdx_expr.format(document_ref),
+    "DocumentRef-spdx-tool-1.2:LicenseRef-MIT-Style-2",
+  )
+  try! @spdx_expr.validate(document_ref, common_licenses())
+}
+
+///|
+test "parse and validate SPDX or-later suffix" {
+  let expr = try! @spdx_expr.parse("GPL-2.0+ OR MIT")
+  @debug.assert_eq(
+    expr,
+    Or(Simple(LicenseOrLater("GPL-2.0")), Simple(License("MIT"))),
+  )
+  @debug.assert_eq(@spdx_expr.format(expr), "GPL-2.0+ OR MIT")
+  try! @spdx_expr.validate(expr, common_licenses())
+}
+
+///|
+test "validation matches license and exception ids case insensitively" {
+  let expr = try! @spdx_expr.parse("mit WITH classpath-EXCEPTION-2.0")
+  try! @spdx_expr.validate(expr, ["MIT"], exception_ids=[
+    "Classpath-exception-2.0",
+  ])
 }
 
 ///|
@@ -125,6 +174,36 @@ test "parser reports invalid expressions" {
     "MIT WITH AND",
   )
   @debug.assert_eq(missing_exception, Err(ExpectedIdentifier(9)))
+
+  let repeated_plus : Result[@spdx_expr.Expr, @spdx_expr.ParseError] = try? @spdx_expr.parse(
+    "MIT++",
+  )
+  @debug.assert_eq(repeated_plus, Err(UnexpectedToken(3, "++")))
+
+  let embedded_plus : Result[@spdx_expr.Expr, @spdx_expr.ParseError] = try? @spdx_expr.parse(
+    "MIT+foo",
+  )
+  @debug.assert_eq(embedded_plus, Err(UnexpectedToken(3, "+foo")))
+
+  let license_ref_plus : Result[@spdx_expr.Expr, @spdx_expr.ParseError] = try? @spdx_expr.parse(
+    "LicenseRef-local+",
+  )
+  @debug.assert_eq(license_ref_plus, Err(UnexpectedToken(16, "+")))
+
+  let document_ref_missing_colon : Result[
+    @spdx_expr.Expr,
+    @spdx_expr.ParseError,
+  ] = try? @spdx_expr.parse("DocumentRef-doc")
+  @debug.assert_eq(document_ref_missing_colon, Err(UnexpectedToken(15, "")))
+
+  let document_ref_missing_license_ref : Result[
+    @spdx_expr.Expr,
+    @spdx_expr.ParseError,
+  ] = try? @spdx_expr.parse("DocumentRef-doc:NotLicenseRef-x")
+  @debug.assert_eq(
+    document_ref_missing_license_ref,
+    Err(ExpectedIdentifier(16)),
+  )
 }
 
 ///|

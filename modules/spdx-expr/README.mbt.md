@@ -5,11 +5,13 @@ Parser, formatter, and validator for SPDX license expressions.
 ```mbt check
 ///|
 test "parse and format expression" {
-  let expr = try! @spdx_expr.parse("(MIT OR Apache-2.0) AND BSD-3-Clause")
+  let expr = try! @spdx_expr.parse(
+    "(MIT OR Apache-2.0+) AND DocumentRef-tool:LicenseRef-custom",
+  )
   @debug.debug_inspect(
     @spdx_expr.format(expr),
     content=(
-      #|"(MIT OR Apache-2.0) AND BSD-3-Clause"
+      #|"(MIT OR Apache-2.0+) AND DocumentRef-tool:LicenseRef-custom"
     ),
   )
 }
@@ -18,7 +20,7 @@ test "parse and format expression" {
 ```mbt check
 ///|
 test "validate with injected license sets" {
-  let expr = try! @spdx_expr.parse("GPL-2.0-only WITH Classpath-exception-2.0")
+  let expr = try! @spdx_expr.parse("gpl-2.0-only WITH classpath-exception-2.0")
   try! @spdx_expr.validate(expr, ["GPL-2.0-only"], exception_ids=[
     "Classpath-exception-2.0",
   ])
