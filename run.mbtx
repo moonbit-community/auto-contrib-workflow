@@ -17,7 +17,7 @@ let discover_minute_of_day : Int = 8 * 60
 let default_cycle_interval_ms : Int = 1000
 
 ///|
-let default_poll_interval_ms : Int = 60 * 1000
+let default_poll_interval_ms : Int = 25 * 60 * 1000
 
 ///|
 fn usage() -> String {
