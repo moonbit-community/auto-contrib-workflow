@@ -1,2 +1,7 @@
 modules/_build/
+_build/
+.mooncakes/
 .DS_Store
+logs/
+.agent-run.lock
+.agent-scheduler.lock
