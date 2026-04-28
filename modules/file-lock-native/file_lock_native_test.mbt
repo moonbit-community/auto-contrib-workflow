@@ -24,6 +24,9 @@ fn native_path(path : String) -> Bytes {
 }
 
 ///|
+const TEST_STATUS_TIMEOUT = 2
+
+///|
 #borrow(path)
 extern "c" fn spawn_holder(path : Bytes, hold_millis : Int) -> Int = "moonbit_file_lock_test_spawn_holder"
 
@@ -33,6 +36,15 @@ extern "c" fn wait_holder(pid : Int) -> Int = "moonbit_file_lock_test_wait_holde
 ///|
 #borrow(path)
 extern "c" fn unlink_test_path(path : Bytes) -> Int = "moonbit_file_lock_test_unlink"
+
+///|
+#borrow(path)
+extern "c" fn expired_timeout_status(
+  path : Bytes,
+  hold_millis : Int,
+  timeout_millis : Int,
+  poll_millis : Int,
+) -> Int = "moonbit_file_lock_test_expired_timeout_status"
 
 ///|
 test "same process lock unlock and reacquire" {
@@ -93,6 +105,16 @@ test "two process timeout contention" {
   }
   ignore(wait_holder(pid))
   let lock_guard = try! @file_lock_native.lock_timeout(path, 200)
+  try! lock_guard.unlock()
+  cleanup(path)
+}
+
+///|
+test "timeout does not acquire after expired deadline" {
+  let path = test_path("expired-timeout")
+  let status = expired_timeout_status(native_path(path), 50, 20, 80)
+  @debug.assert_eq(status, TEST_STATUS_TIMEOUT)
+  let lock_guard = try! @file_lock_native.try_lock(path)
   try! lock_guard.unlock()
   cleanup(path)
 }

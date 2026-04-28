@@ -23,6 +23,8 @@
 #define MOONBIT_FILE_LOCK_MODE_TRY 1
 #define MOONBIT_FILE_LOCK_MODE_TIMEOUT 2
 
+#define MOONBIT_FILE_LOCK_POLL_MILLIS 10
+
 typedef struct {
   int fd;
   int status;
@@ -88,22 +90,46 @@ static int64_t moonbit_file_lock_now_millis(void) {
   return ((int64_t)now.tv_sec * 1000) + (now.tv_nsec / 1000000);
 }
 
-static int moonbit_file_lock_try_fd(int fd, int timeout_millis) {
+static int moonbit_file_lock_try_fd(int fd, int timeout_millis,
+                                    int poll_millis) {
   int64_t deadline = moonbit_file_lock_now_millis() + timeout_millis;
+  if (poll_millis <= 0) {
+    poll_millis = MOONBIT_FILE_LOCK_POLL_MILLIS;
+  }
+  if (moonbit_file_lock_set(fd, F_SETLK) == 0) {
+    return MOONBIT_FILE_LOCK_STATUS_OK;
+  }
+  int err = errno;
+  if (!moonbit_file_lock_conflict_errno(err)) {
+    errno = err;
+    return MOONBIT_FILE_LOCK_STATUS_IO;
+  }
   for (;;) {
+    if (timeout_millis <= 0) {
+      errno = err;
+      return MOONBIT_FILE_LOCK_STATUS_TIMEOUT;
+    }
+    int64_t now = moonbit_file_lock_now_millis();
+    if (now >= deadline) {
+      errno = err;
+      return MOONBIT_FILE_LOCK_STATUS_TIMEOUT;
+    }
+    int64_t remaining = deadline - now;
+    int sleep_millis =
+        (int64_t)poll_millis < remaining ? poll_millis : (int)remaining;
+    moonbit_file_lock_sleep_millis(sleep_millis);
+    if (moonbit_file_lock_now_millis() >= deadline) {
+      errno = err;
+      return MOONBIT_FILE_LOCK_STATUS_TIMEOUT;
+    }
     if (moonbit_file_lock_set(fd, F_SETLK) == 0) {
       return MOONBIT_FILE_LOCK_STATUS_OK;
     }
-    int err = errno;
+    err = errno;
     if (!moonbit_file_lock_conflict_errno(err)) {
       errno = err;
       return MOONBIT_FILE_LOCK_STATUS_IO;
     }
-    if (timeout_millis <= 0 || moonbit_file_lock_now_millis() >= deadline) {
-      errno = err;
-      return MOONBIT_FILE_LOCK_STATUS_TIMEOUT;
-    }
-    moonbit_file_lock_sleep_millis(10);
   }
 }
 
@@ -137,7 +163,8 @@ MOONBIT_FFI_EXPORT void *moonbit_file_lock_acquire(moonbit_bytes_t path,
                    : MOONBIT_FILE_LOCK_STATUS_IO;
     }
   } else if (mode == MOONBIT_FILE_LOCK_MODE_TIMEOUT) {
-    status = moonbit_file_lock_try_fd(fd, timeout_millis);
+    status = moonbit_file_lock_try_fd(fd, timeout_millis,
+                                      MOONBIT_FILE_LOCK_POLL_MILLIS);
     if (status != MOONBIT_FILE_LOCK_STATUS_OK) {
       saved_errno = errno;
     }
@@ -249,4 +276,31 @@ MOONBIT_FFI_EXPORT int32_t moonbit_file_lock_test_unlink(
     return 0;
   }
   return -errno;
+}
+
+MOONBIT_FFI_EXPORT int32_t moonbit_file_lock_test_expired_timeout_status(
+    moonbit_bytes_t path, int32_t hold_millis, int32_t timeout_millis,
+    int32_t poll_millis) {
+  int32_t pid = moonbit_file_lock_test_spawn_holder(path, hold_millis);
+  if (pid <= 0) {
+    return MOONBIT_FILE_LOCK_STATUS_IO;
+  }
+
+  int fd;
+  do {
+    fd = open((const char *)path, O_RDWR | O_CREAT | O_CLOEXEC, 0666);
+  } while (fd < 0 && errno == EINTR);
+
+  if (fd < 0) {
+    (void)moonbit_file_lock_test_wait_holder(pid);
+    return MOONBIT_FILE_LOCK_STATUS_IO;
+  }
+
+  int status = moonbit_file_lock_try_fd(fd, timeout_millis, poll_millis);
+  if (status == MOONBIT_FILE_LOCK_STATUS_OK) {
+    moonbit_file_lock_unset(fd);
+  }
+  close(fd);
+  (void)moonbit_file_lock_test_wait_holder(pid);
+  return status;
 }
