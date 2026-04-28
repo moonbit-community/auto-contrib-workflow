@@ -1,0 +1,3 @@
+*.mbt text eol=lf
+*.c text eol=lf
+pkg.generated.mbti whitespace=-blank-at-eof

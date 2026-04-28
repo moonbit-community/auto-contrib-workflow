@@ -1,0 +1,37 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/file_lock_native"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn lock(String) -> LockGuard raise LockError
+
+pub fn lock_timeout(String, Int) -> LockGuard raise LockError
+
+pub fn try_lock(String) -> LockGuard raise LockError
+
+pub fn unlock(LockGuard) -> Unit raise LockError
+
+pub fn[A] with_lock(String, (LockGuard) -> A raise) -> A raise
+
+pub fn[A] with_lock_timeout(String, Int, (LockGuard) -> A raise) -> A raise
+
+// Errors
+pub(all) suberror LockError {
+  AlreadyLocked(String)
+  Timeout(String)
+  Io(String, String, Int)
+  Unsupported
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+#external
+pub(all) type LockGuard
+pub fn LockGuard::unlock(Self) -> Unit raise LockError
+
+// Type aliases
+
+// Traits
+

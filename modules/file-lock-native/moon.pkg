@@ -1,0 +1,16 @@
+import {
+  "moonbitlang/core/encoding/utf8" @encoding/utf8,
+}
+
+import {
+  "moonbitlang/core/debug" @debug,
+  "moonbitlang/core/env" @env,
+} for "test"
+
+options(
+  "native-stub": [ "file_lock_native.c" ],
+  targets: {
+    "file_lock_native_test.mbt": [ "native", "llvm" ],
+    "file_lock_non_native_test.mbt": [ "wasm", "wasm-gc", "js" ],
+  },
+)
