@@ -27,7 +27,7 @@ pub(all) suberror MigrationError {
   OutOfOrder(String, String)
   DuplicateJournalVersion(String)
   UnknownAppliedVersion(String)
-  ApplyFailed(String, String)
+  ApplyFailed(String, String, Journal)
 } derive(Eq, @debug.Debug)
 
 // Types and methods

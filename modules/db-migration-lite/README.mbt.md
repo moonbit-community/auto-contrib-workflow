@@ -6,6 +6,9 @@ SQLite-oriented tools.
 This package intentionally keeps database I/O outside the core API. Callers
 provide discovered migration file contents, execute pending SQL with their own
 SQLite adapter, and record successful migrations through the journal helpers.
+If a later migration fails, `ApplyFailed` includes the partial journal so
+callers can persist or retry from the successful prior migrations without
+running them again.
 
 ```mbt check
 ///|

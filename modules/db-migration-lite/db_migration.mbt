@@ -69,7 +69,10 @@ pub(all) suberror MigrationError {
   /// The journal references a migration version that is not in the migration set.
   UnknownAppliedVersion(String)
   /// A pending migration failed while being applied.
-  ApplyFailed(String, String)
+  ///
+  /// Fields are failed version, reason, and the journal containing successful
+  /// migrations recorded before the failure.
+  ApplyFailed(String, String, Journal)
 } derive(Eq, Debug)
 
 ///|
@@ -207,8 +210,9 @@ pub fn plan(
 /// Applies pending migrations in version order and records only successes.
 ///
 /// The callback is responsible for executing SQL with the caller's database
-/// adapter. If it returns `Failed`, that migration is not recorded and later
-/// migrations are not attempted.
+/// adapter. If it returns `Failed`, that migration is not recorded, later
+/// migrations are not attempted, and `ApplyFailed` exposes the journal with
+/// prior successful migrations.
 pub fn apply_pending(
   migrations : Array[Migration],
   journal : Journal,
@@ -219,7 +223,7 @@ pub fn apply_pending(
   for migration in migration_plan.pending {
     match apply(migration) {
       Applied => current = current.record_success(migration)
-      Failed(reason) => raise ApplyFailed(migration.version, reason)
+      Failed(reason) => raise ApplyFailed(migration.version, reason, current)
     }
   }
   current

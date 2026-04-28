@@ -229,16 +229,27 @@ test "failed migration is not marked applied" {
       }
     },
   )
-  @debug.assert_eq(result, Err(ApplyFailed("002", "syntax error")))
   @debug.assert_eq(attempts, 2)
-  let partial = try! @db_migration_lite.apply_pending(
-    [migrations[0]],
-    @db_migration_lite.Journal::new(),
-    _migration => Applied,
-  )
-  @debug.assert_eq(partial.entries(), [
-    entry("001", "create_users", "001_create_users.sql"),
-  ])
+  match result {
+    Err(ApplyFailed(version, reason, partial)) => {
+      @debug.assert_eq(version, "002")
+      @debug.assert_eq(reason, "syntax error")
+      @debug.assert_eq(partial.entries(), [
+        entry("001", "create_users", "001_create_users.sql"),
+      ])
+      let retry_versions : Array[String] = []
+      let retry = try! @db_migration_lite.apply_pending(migrations, partial, migration => {
+        retry_versions.push(migration.version)
+        Applied
+      })
+      @debug.assert_eq(retry_versions, ["002"])
+      @debug.assert_eq(retry.entries(), [
+        entry("001", "create_users", "001_create_users.sql"),
+        entry("002", "add_email", "002_add_email.sql"),
+      ])
+    }
+    _ => fail("apply_pending should expose the partial journal on failure")
+  }
 }
 
 ///|
