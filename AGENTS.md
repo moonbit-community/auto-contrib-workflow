@@ -144,7 +144,7 @@ Requirements:
 
 ### Review Agent
 
-Find PRs in the repository that correspond to `status:doing` issues and are not draft PRs. Review them strictly. If a PR has problems, post review feedback to the corresponding PR. If a PR has no problems, update the status label to `status:review`.
+Find PRs in the repository that correspond to `status:doing` issues, are not draft PRs, and do not have the `require changes` label. Ignore PRs with the `require changes` label; they remain for the Coding Agent. Review eligible PRs strictly. If a PR has problems, post review feedback to the corresponding PR. If a PR has no problems, update the status label to `status:review`.
 
 Do not save review copies in this workflow repository. Prioritize correctness, scope control, test quality, and maintainability.
 
