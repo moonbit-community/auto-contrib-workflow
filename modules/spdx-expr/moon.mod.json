@@ -1,0 +1,9 @@
+{
+  "name": "moonbit-community/spdx_expr",
+  "version": "0.1.0",
+  "readme": "README.mbt.md",
+  "repository": "https://github.com/Yoorkin/auto-contrib-workflow",
+  "license": "Apache-2.0",
+  "keywords": ["spdx", "license", "parser", "metadata"],
+  "description": "SPDX license expression parser, formatter, and validator"
+}
