@@ -1,0 +1,46 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/spdx_expr"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn format(Expr) -> String
+
+pub fn parse(String) -> Expr raise ParseError
+
+pub fn validate(Expr, Array[String], exception_ids? : Array[String]) -> Unit raise ValidationError
+
+// Errors
+pub(all) suberror ParseError {
+  ExpectedExpression(Int)
+  ExpectedIdentifier(Int)
+  UnclosedParen(Int)
+  InvalidWithTarget(Int)
+  UnexpectedToken(Int, String)
+} derive(Eq, @debug.Debug)
+
+pub(all) suberror ValidationError {
+  UnknownLicense(String)
+  UnknownException(String)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+pub(all) enum Expr {
+  Simple(SimpleExpr)
+  With(SimpleExpr, String)
+  And(Expr, Expr)
+  Or(Expr, Expr)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum SimpleExpr {
+  License(String)
+  LicenseOrLater(String)
+  LicenseRef(String?, String)
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
+
