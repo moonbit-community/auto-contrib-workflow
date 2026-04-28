@@ -165,6 +165,10 @@ issue。
 
 要求：
 
+- 阻塞修改的 module 不符合发布标准的PR
+  - 没有正确增加语义化版本
+  - 已知的 meta 信息缺失或者有误，例如repo、keywords、license、description
+  - 模块文件夹内包含未经明确批准的安全敏感信息
 - 阻塞忽略反馈的PR
   - 实现是否回应了人的review反馈，特别是代码间的comment。
   - 如果人的反馈与issue任务计划冲突，以人的反馈为准。
