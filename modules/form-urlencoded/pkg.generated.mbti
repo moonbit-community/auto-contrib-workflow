@@ -1,0 +1,35 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/urlencoded"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decode(String, mode? : ParseMode) -> Array[Pair] raise DecodeError
+
+pub fn encode(Array[Pair]) -> String
+
+pub fn escape(String) -> String
+
+// Errors
+pub(all) suberror DecodeError {
+  InvalidPercent(Int, String)
+  InvalidUtf8(Int)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+pub(all) struct Pair {
+  key : String
+  value : String
+} derive(Eq, @debug.Debug)
+
+pub(all) enum ParseMode {
+  Strict
+  Lenient
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
+
