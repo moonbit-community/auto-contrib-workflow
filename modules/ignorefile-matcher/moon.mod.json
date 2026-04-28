@@ -1,0 +1,9 @@
+{
+  "name": "moonbit-community/ignorefile_matcher",
+  "version": "0.1.0",
+  "readme": "README.mbt.md",
+  "repository": "https://github.com/Yoorkin/auto-contrib-workflow",
+  "license": "Apache-2.0",
+  "keywords": ["ignore", "gitignore", "glob", "matcher"],
+  "description": "Ignore-file parser and path matcher for MoonBit tools"
+}

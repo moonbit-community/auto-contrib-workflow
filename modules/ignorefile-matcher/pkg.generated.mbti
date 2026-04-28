@@ -1,0 +1,48 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/ignorefile_matcher"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn build(Array[IgnoreFile]) -> IgnoreMatcher
+
+pub fn from_text(String, source? : String, base? : String) -> IgnoreMatcher
+
+pub fn parse(String, source? : String, base? : String) -> IgnoreFile
+
+// Errors
+
+// Types and methods
+pub(all) struct Explanation {
+  ignored : Bool
+  rule : IgnoreRule
+} derive(Eq, @debug.Debug)
+
+pub(all) struct IgnoreFile {
+  source : String
+  base : String
+  rules : Array[IgnoreRule]
+} derive(Eq, @debug.Debug)
+
+pub struct IgnoreMatcher {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn IgnoreMatcher::explain(Self, String, is_dir? : Bool) -> Explanation?
+pub fn IgnoreMatcher::is_ignored(Self, String, is_dir? : Bool) -> Bool
+
+pub(all) struct IgnoreRule {
+  source : String
+  line : Int
+  pattern : String
+  base : String
+  negated : Bool
+  directory_only : Bool
+  anchored : Bool
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
+
