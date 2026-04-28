@@ -1,0 +1,9 @@
+{
+  "name": "moonbit-community/globset_lite",
+  "version": "0.1.0",
+  "readme": "README.mbt.md",
+  "repository": "https://github.com/Yoorkin/auto-contrib-workflow",
+  "license": "Apache-2.0",
+  "keywords": ["glob", "globset", "path", "matcher"],
+  "description": "Compiled glob and glob-set path matcher"
+}

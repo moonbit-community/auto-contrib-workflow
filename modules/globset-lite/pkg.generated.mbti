@@ -1,0 +1,54 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/globset_lite"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn compile(String) -> Glob raise GlobError
+
+pub fn compile_set(Array[String]) -> GlobSet raise GlobError
+
+pub fn describe_error(GlobError) -> String
+
+pub fn matched_ids(GlobSet, String) -> Array[Int]
+
+pub fn matches(Glob, String) -> Bool
+
+pub fn matches_any(GlobSet, String) -> Bool
+
+pub fn pattern(Glob) -> String
+
+// Errors
+pub(all) suberror GlobError {
+  EmptyPattern
+  EmptySegment(Int)
+  InvalidRecursiveWildcard(Int)
+  UnclosedClass(Int)
+  EmptyClass(Int)
+  InvalidRange(Int, String)
+  InvalidPattern(Int, String)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+type ByteRange derive(Eq, @debug.Debug)
+
+type CharClass derive(Eq, @debug.Debug)
+
+pub struct Glob {
+  // private fields
+}
+
+pub struct GlobSet {
+  // private fields
+}
+
+type Piece derive(Eq, @debug.Debug)
+
+type Segment derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
+
