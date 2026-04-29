@@ -6,25 +6,6 @@ import {
 }
 
 // Values
-pub fn allow(TokenBucket, Int64, cost? : Int) -> Decision
-
-pub fn available_tokens(TokenBucket) -> Int
-
-pub fn capacity(TokenBucket) -> Int
-
-pub fn check(TokenBucket, Int64, cost? : Int) -> Decision
-
-pub fn last_refill_ms(TokenBucket) -> Int64
-
-pub fn new_token_bucket(Int, Int, Int64, Int64) -> TokenBucket raise ConfigError
-
-pub fn new_token_bucket_with_tokens(Int, Int, Int64, Int64, Int) -> TokenBucket raise ConfigError
-
-pub fn refill(TokenBucket, Int64) -> TokenBucket
-
-pub fn refill_period_ms(TokenBucket) -> Int64
-
-pub fn refill_tokens(TokenBucket) -> Int
 
 // Errors
 pub(all) suberror ConfigError {
@@ -52,6 +33,16 @@ pub(all) enum DenialReason {
 pub struct TokenBucket {
   // private fields
 } derive(Eq, @debug.Debug)
+pub fn TokenBucket::allow(Self, Int64, cost? : Int) -> Decision
+pub fn TokenBucket::available_tokens(Self) -> Int
+pub fn TokenBucket::capacity(Self) -> Int
+pub fn TokenBucket::check(Self, Int64, cost? : Int) -> Decision
+pub fn TokenBucket::last_refill_ms(Self) -> Int64
+pub fn TokenBucket::new(Int, Int, Int64, Int64) -> Self raise ConfigError
+pub fn TokenBucket::refill(Self, Int64) -> Self
+pub fn TokenBucket::refill_period_ms(Self) -> Int64
+pub fn TokenBucket::refill_tokens(Self) -> Int
+pub fn TokenBucket::with_tokens(Int, Int, Int64, Int64, Int) -> Self raise ConfigError
 
 // Type aliases
 

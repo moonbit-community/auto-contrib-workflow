@@ -25,3 +25,16 @@ test "non negative delta never returns a negative delay" {
   @debug.assert_eq(non_negative_delta(3L, 10L), 0L)
   @debug.assert_eq(non_negative_delta(max_int64(), -1L), max_int64())
 }
+
+///|
+test "elapsed refill helpers handle signed Int64 boundaries" {
+  let min = -9_223_372_036_854_775_807L - 1L
+  let near_max = 9_223_372_036_854_775_700L
+  let completed = completed_refill_since(min, near_max, 100L)
+  @debug.assert_eq(completed.refilled_at, 9_223_372_036_854_775_692L)
+  @debug.assert_eq(elapsed_remainder(min, max_int64(), 100L), 15L)
+  @debug.assert_eq(positive_mod(-1L, 100L), 99L)
+  @debug.assert_eq(completed_periods_since(10L, 10L, 100L), 0L)
+  @debug.assert_eq(completed_periods_since(min, max_int64(), 1L), max_int64())
+  @debug.assert_eq(saturating_add_non_negative(max_int64(), 1L), max_int64())
+}

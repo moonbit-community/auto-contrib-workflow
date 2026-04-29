@@ -11,17 +11,17 @@ the current millisecond timestamp to every operation, so tests can use fixed
 timelines and production code can use wall-clock or monotonic time from its own
 runtime.
 
-Use `allow` when the request should consume tokens immediately on success. Use
-`check` when the caller only wants to inspect the decision and delay without
-mutating the token count.
+Use `bucket.allow` when the request should consume tokens immediately on
+success. Use `bucket.check` when the caller only wants to inspect the decision
+and delay without mutating the token count.
 
 ```mbt check
 ///|
 test "token bucket example" {
-  let bucket = try! @rate_limit_policy.new_token_bucket(3, 1, 1000L, 0L)
-  let first = @rate_limit_policy.allow(bucket, 0L)
-  let second = @rate_limit_policy.allow(first.bucket, 0L, cost=2)
-  let third = @rate_limit_policy.allow(second.bucket, 0L)
+  let bucket = try! @rate_limit_policy.TokenBucket::new(3, 1, 1000L, 0L)
+  let first = bucket.allow(0L)
+  let second = first.bucket.allow(0L, cost=2)
+  let third = second.bucket.allow(0L)
   @debug.debug_inspect(
     (first.allowed, second.allowed, third.allowed, third.next_available_ms),
     content=(
@@ -38,10 +38,10 @@ be retained for the next attempt.
 ```mbt check
 ///|
 test "reservation delay example" {
-  let bucket = try! @rate_limit_policy.new_token_bucket_with_tokens(
+  let bucket = try! @rate_limit_policy.TokenBucket::with_tokens(
     10, 3, 100L, 0L, 1,
   )
-  let decision = @rate_limit_policy.check(bucket, 50L, cost=7)
+  let decision = bucket.check(50L, cost=7)
   @debug.debug_inspect(
     (decision.allowed, decision.delay_ms, decision.next_available_ms),
     content=(
@@ -57,7 +57,7 @@ This package intentionally does not depend on a clock, sleep function, HTTP
 framework, or async runtime. A runtime adapter should:
 
 - read the runtime's current time as milliseconds,
-- call `allow` to reserve capacity before starting work,
+- call `bucket.allow` to reserve capacity before starting work,
 - sleep for `decision.delay_ms` when the request is denied,
 - persist the returned bucket state in the caller's queue, map, or protected
   shared state.
@@ -85,7 +85,7 @@ fn sleep_delay_ms(delay_ms : Int64) -> Int {
 async fn wait_for_slot(
   bucket : @rate_limit_policy.TokenBucket
 ) -> @rate_limit_policy.TokenBucket {
-  let decision = @rate_limit_policy.allow(bucket, @async.now())
+  let decision = bucket.allow(@async.now())
   if decision.allowed {
     decision.bucket
   } else {

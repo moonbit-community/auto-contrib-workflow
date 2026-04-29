@@ -54,20 +54,20 @@ pub(all) struct Decision {
 
 ///|
 /// Creates a full token bucket at `now_ms`.
-pub fn new_token_bucket(
+pub fn TokenBucket::new(
   capacity : Int,
   refill_tokens : Int,
   refill_period_ms : Int64,
   now_ms : Int64,
 ) -> TokenBucket raise ConfigError {
-  new_token_bucket_with_tokens(
+  TokenBucket::with_tokens(
     capacity, refill_tokens, refill_period_ms, now_ms, capacity,
   )
 }
 
 ///|
 /// Creates a token bucket with an explicit initial token count.
-pub fn new_token_bucket_with_tokens(
+pub fn TokenBucket::with_tokens(
   capacity : Int,
   refill_tokens : Int,
   refill_period_ms : Int64,
@@ -89,32 +89,32 @@ pub fn new_token_bucket_with_tokens(
 
 ///|
 /// Returns the maximum number of tokens this bucket can hold.
-pub fn capacity(bucket : TokenBucket) -> Int {
-  bucket.capacity
+pub fn TokenBucket::capacity(self : TokenBucket) -> Int {
+  self.capacity
 }
 
 ///|
 /// Returns the number of tokens added per completed refill period.
-pub fn refill_tokens(bucket : TokenBucket) -> Int {
-  bucket.refill_tokens
+pub fn TokenBucket::refill_tokens(self : TokenBucket) -> Int {
+  self.refill_tokens
 }
 
 ///|
 /// Returns the refill period in milliseconds.
-pub fn refill_period_ms(bucket : TokenBucket) -> Int64 {
-  bucket.refill_period_ms
+pub fn TokenBucket::refill_period_ms(self : TokenBucket) -> Int64 {
+  self.refill_period_ms
 }
 
 ///|
 /// Returns the currently stored tokens without applying a refill.
-pub fn available_tokens(bucket : TokenBucket) -> Int {
-  bucket.tokens
+pub fn TokenBucket::available_tokens(self : TokenBucket) -> Int {
+  self.tokens
 }
 
 ///|
 /// Returns the timestamp used as the base for future refill periods.
-pub fn last_refill_ms(bucket : TokenBucket) -> Int64 {
-  bucket.last_refill_ms
+pub fn TokenBucket::last_refill_ms(self : TokenBucket) -> Int64 {
+  self.last_refill_ms
 }
 
 ///|
@@ -122,28 +122,30 @@ pub fn last_refill_ms(bucket : TokenBucket) -> Int64 {
 ///
 /// If `now_ms` is earlier than the bucket's last refill timestamp, no refill is
 /// applied and the original state is returned.
-pub fn refill(bucket : TokenBucket, now_ms : Int64) -> TokenBucket {
-  if now_ms <= bucket.last_refill_ms {
-    return bucket
+pub fn TokenBucket::refill(self : TokenBucket, now_ms : Int64) -> TokenBucket {
+  if now_ms <= self.last_refill_ms {
+    return self
   }
-  let elapsed = now_ms - bucket.last_refill_ms
-  let periods = elapsed / bucket.refill_period_ms
-  if periods <= 0 {
-    return bucket
+  let completed = completed_refill_since(
+    self.last_refill_ms,
+    now_ms,
+    self.refill_period_ms,
+  )
+  if completed.periods <= 0L {
+    return self
   }
-  let refilled_at = bucket.last_refill_ms + periods * bucket.refill_period_ms
-  let missing = bucket.capacity - bucket.tokens
+  let missing = self.capacity - self.tokens
   if missing <= 0 {
-    return bucket_with(bucket, bucket.capacity, refilled_at)
+    return bucket_with(self, self.capacity, completed.refilled_at)
   }
-  let periods_to_full = ceil_div(missing, bucket.refill_tokens)
-  if periods >= periods_to_full.to_int64() {
-    bucket_with(bucket, bucket.capacity, refilled_at)
+  let periods_to_full = ceil_div(missing, self.refill_tokens)
+  if completed.periods >= periods_to_full.to_int64() {
+    bucket_with(self, self.capacity, completed.refilled_at)
   } else {
     bucket_with(
-      bucket,
-      bucket.tokens + (periods * bucket.refill_tokens.to_int64()).to_int(),
-      refilled_at,
+      self,
+      self.tokens + (completed.periods * self.refill_tokens.to_int64()).to_int(),
+      completed.refilled_at,
     )
   }
 }
@@ -152,8 +154,12 @@ pub fn refill(bucket : TokenBucket, now_ms : Int64) -> TokenBucket {
 /// Checks whether a request of `cost` tokens can run at `now_ms`.
 ///
 /// This function refills the returned bucket but does not consume tokens.
-pub fn check(bucket : TokenBucket, now_ms : Int64, cost? : Int = 1) -> Decision {
-  decide(bucket, now_ms, cost, consume=false)
+pub fn TokenBucket::check(
+  self : TokenBucket,
+  now_ms : Int64,
+  cost? : Int = 1,
+) -> Decision {
+  decide(self, now_ms, cost, consume=false)
 }
 
 ///|
@@ -161,8 +167,12 @@ pub fn check(bucket : TokenBucket, now_ms : Int64, cost? : Int = 1) -> Decision 
 ///
 /// Denied requests do not consume tokens. The returned decision includes a
 /// deterministic next-available timestamp when the request can eventually fit.
-pub fn allow(bucket : TokenBucket, now_ms : Int64, cost? : Int = 1) -> Decision {
-  decide(bucket, now_ms, cost, consume=true)
+pub fn TokenBucket::allow(
+  self : TokenBucket,
+  now_ms : Int64,
+  cost? : Int = 1,
+) -> Decision {
+  decide(self, now_ms, cost, consume=true)
 }
 
 ///|
@@ -189,7 +199,7 @@ fn decide(
   cost : Int,
   consume~ : Bool,
 ) -> Decision {
-  let current = refill(bucket, now_ms)
+  let current = bucket.refill(now_ms)
   if cost <= 0 {
     decision(false, current, Some(InvalidCost(cost)), None, 0)
   } else if cost > current.capacity {
@@ -260,6 +270,88 @@ fn ceil_div(value : Int, divisor : Int) -> Int {
 }
 
 ///|
+priv struct CompletedRefill {
+  periods : Int64
+  refilled_at : Int64
+}
+
+///|
+fn completed_refill_since(
+  last_refill_ms : Int64,
+  now_ms : Int64,
+  refill_period_ms : Int64,
+) -> CompletedRefill {
+  let periods = completed_periods_since(
+    last_refill_ms, now_ms, refill_period_ms,
+  )
+  let remainder = elapsed_remainder(last_refill_ms, now_ms, refill_period_ms)
+  { periods, refilled_at: now_ms - remainder }
+}
+
+///|
+fn completed_periods_since(
+  last_refill_ms : Int64,
+  now_ms : Int64,
+  refill_period_ms : Int64,
+) -> Int64 {
+  if now_ms <= last_refill_ms {
+    0L
+  } else if last_refill_ms >= 0L || now_ms < 0L {
+    (now_ms - last_refill_ms) / refill_period_ms
+  } else {
+    completed_periods_across_zero(last_refill_ms, now_ms, refill_period_ms)
+  }
+}
+
+///|
+fn completed_periods_across_zero(
+  last_refill_ms : Int64,
+  now_ms : Int64,
+  refill_period_ms : Int64,
+) -> Int64 {
+  let left = -(last_refill_ms + 1L)
+  let right = now_ms
+  let left_periods = left / refill_period_ms
+  let right_periods = right / refill_period_ms
+  let left_remainder = left % refill_period_ms
+  let right_remainder = right % refill_period_ms
+  let carry = if right_remainder >= refill_period_ms - 1L - left_remainder {
+    1L
+  } else {
+    0L
+  }
+  saturating_add_non_negative(
+    saturating_add_non_negative(left_periods, right_periods),
+    carry,
+  )
+}
+
+///|
+fn elapsed_remainder(
+  last_refill_ms : Int64,
+  now_ms : Int64,
+  refill_period_ms : Int64,
+) -> Int64 {
+  let now_remainder = positive_mod(now_ms, refill_period_ms)
+  let last_remainder = positive_mod(last_refill_ms, refill_period_ms)
+  if now_remainder >= last_remainder {
+    now_remainder - last_remainder
+  } else {
+    refill_period_ms - (last_remainder - now_remainder)
+  }
+}
+
+///|
+fn positive_mod(value : Int64, divisor : Int64) -> Int64 {
+  let remainder = value % divisor
+  if remainder < 0L {
+    remainder + divisor
+  } else {
+    remainder
+  }
+}
+
+///|
 fn saturating_ready_at(
   last_refill_ms : Int64,
   periods_needed : Int,
@@ -273,6 +365,18 @@ fn saturating_ready_at(
     max
   } else {
     saturating_add_positive(last_refill_ms, periods * refill_period_ms)
+  }
+}
+
+///|
+fn saturating_add_non_negative(left : Int64, right : Int64) -> Int64 {
+  let max = max_int64()
+  if right <= 0L {
+    left
+  } else if left > max - right {
+    max
+  } else {
+    left + right
   }
 }
 
