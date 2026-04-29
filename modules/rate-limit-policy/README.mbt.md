@@ -98,3 +98,53 @@ async fn wait_for_slot(
 Keep synchronization outside this package. For example, async applications that
 share one bucket across tasks should protect the stored bucket with their own
 queue, actor, mutex, or semaphore and update it with each returned state.
+
+### Crescent middleware
+
+After adding `bobzhang/crescent` alongside `moonbitlang/async`, keep the bucket
+state in the application-owned storage that matches the deployment model. The
+example below uses one shared bucket for an endpoint. Production services
+usually key buckets by API token, account, or client address and protect that map
+with the service's own concurrency primitive.
+
+```mbt nocheck
+import {
+  "bobzhang/crescent"
+  "moonbitlang/async" @async
+  "moonbit-community/rate_limit_policy" @rate_limit_policy
+}
+
+fn retry_after_seconds(delay_ms : Int64) -> Int64 {
+  if delay_ms <= 0L {
+    0L
+  } else {
+    (delay_ms - 1L) / 1000L + 1L
+  }
+}
+
+async fn main {
+  let app = @crescent.App()
+  let limiter = Ref::Ref(
+    try! @rate_limit_policy.TokenBucket::new(60, 10, 1000L, @async.now()),
+  )
+
+  app.use_middleware(
+    (_, next) => {
+      let decision = limiter.val.allow(@async.now())
+      limiter.val = decision.bucket
+      if decision.allowed {
+        next()
+      } else {
+        @crescent.HttpResponse::error(
+          @crescent.StatusCode::from_int(429),
+          "rate limit exceeded",
+        ).header("Retry-After", "\{retry_after_seconds(decision.delay_ms)}")
+      }
+    },
+    base_path="/api",
+  )
+
+  app.get("/api/search", _ => "search accepted")
+  app.serve(port=4000)
+}
+```
