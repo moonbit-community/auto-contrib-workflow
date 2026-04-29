@@ -6,9 +6,9 @@
 pub struct TokenBucket {
   priv capacity : Int
   priv refill_tokens : Int
-  priv refill_period_ms : Int
+  priv refill_period_ms : Int64
   priv tokens : Int
-  priv last_refill_ms : Int
+  priv last_refill_ms : Int64
 } derive(Eq, Debug)
 
 ///|
@@ -19,7 +19,7 @@ pub(all) suberror ConfigError {
   /// Each refill step must add at least one token.
   NonPositiveRefillTokens(Int)
   /// The refill period must be greater than zero milliseconds.
-  NonPositiveRefillPeriod(Int)
+  NonPositiveRefillPeriod(Int64)
   /// The initial token count must be within `[0, capacity]`.
   InitialTokensOutOfRange(Int, Int)
 } derive(Eq, Debug)
@@ -46,10 +46,10 @@ pub(all) struct Decision {
   /// A structured denial reason when `allowed` is false.
   reason : DenialReason?
   /// The timestamp when this request can next run, if it can ever fit.
-  next_available_ms : Int?
+  next_available_ms : Int64?
   /// Milliseconds until `next_available_ms`, or zero for immediate/impossible
   /// decisions.
-  delay_ms : Int
+  delay_ms : Int64
 } derive(Eq, Debug)
 
 ///|
@@ -57,8 +57,8 @@ pub(all) struct Decision {
 pub fn new_token_bucket(
   capacity : Int,
   refill_tokens : Int,
-  refill_period_ms : Int,
-  now_ms : Int,
+  refill_period_ms : Int64,
+  now_ms : Int64,
 ) -> TokenBucket raise ConfigError {
   new_token_bucket_with_tokens(
     capacity, refill_tokens, refill_period_ms, now_ms, capacity,
@@ -70,8 +70,8 @@ pub fn new_token_bucket(
 pub fn new_token_bucket_with_tokens(
   capacity : Int,
   refill_tokens : Int,
-  refill_period_ms : Int,
-  now_ms : Int,
+  refill_period_ms : Int64,
+  now_ms : Int64,
   initial_tokens : Int,
 ) -> TokenBucket raise ConfigError {
   validate_config(capacity, refill_tokens, refill_period_ms)
@@ -101,7 +101,7 @@ pub fn refill_tokens(bucket : TokenBucket) -> Int {
 
 ///|
 /// Returns the refill period in milliseconds.
-pub fn refill_period_ms(bucket : TokenBucket) -> Int {
+pub fn refill_period_ms(bucket : TokenBucket) -> Int64 {
   bucket.refill_period_ms
 }
 
@@ -113,7 +113,7 @@ pub fn available_tokens(bucket : TokenBucket) -> Int {
 
 ///|
 /// Returns the timestamp used as the base for future refill periods.
-pub fn last_refill_ms(bucket : TokenBucket) -> Int {
+pub fn last_refill_ms(bucket : TokenBucket) -> Int64 {
   bucket.last_refill_ms
 }
 
@@ -122,7 +122,7 @@ pub fn last_refill_ms(bucket : TokenBucket) -> Int {
 ///
 /// If `now_ms` is earlier than the bucket's last refill timestamp, no refill is
 /// applied and the original state is returned.
-pub fn refill(bucket : TokenBucket, now_ms : Int) -> TokenBucket {
+pub fn refill(bucket : TokenBucket, now_ms : Int64) -> TokenBucket {
   if now_ms <= bucket.last_refill_ms {
     return bucket
   }
@@ -131,18 +131,19 @@ pub fn refill(bucket : TokenBucket, now_ms : Int) -> TokenBucket {
   if periods <= 0 {
     return bucket
   }
+  let refilled_at = bucket.last_refill_ms + periods * bucket.refill_period_ms
   let missing = bucket.capacity - bucket.tokens
   if missing <= 0 {
-    return bucket_with(bucket, bucket.capacity, now_ms)
+    return bucket_with(bucket, bucket.capacity, refilled_at)
   }
   let periods_to_full = ceil_div(missing, bucket.refill_tokens)
-  if periods >= periods_to_full {
-    bucket_with(bucket, bucket.capacity, now_ms)
+  if periods >= periods_to_full.to_int64() {
+    bucket_with(bucket, bucket.capacity, refilled_at)
   } else {
     bucket_with(
       bucket,
-      bucket.tokens + periods * bucket.refill_tokens,
-      bucket.last_refill_ms + periods * bucket.refill_period_ms,
+      bucket.tokens + (periods * bucket.refill_tokens.to_int64()).to_int(),
+      refilled_at,
     )
   }
 }
@@ -151,7 +152,7 @@ pub fn refill(bucket : TokenBucket, now_ms : Int) -> TokenBucket {
 /// Checks whether a request of `cost` tokens can run at `now_ms`.
 ///
 /// This function refills the returned bucket but does not consume tokens.
-pub fn check(bucket : TokenBucket, now_ms : Int, cost? : Int = 1) -> Decision {
+pub fn check(bucket : TokenBucket, now_ms : Int64, cost? : Int = 1) -> Decision {
   decide(bucket, now_ms, cost, consume=false)
 }
 
@@ -160,7 +161,7 @@ pub fn check(bucket : TokenBucket, now_ms : Int, cost? : Int = 1) -> Decision {
 ///
 /// Denied requests do not consume tokens. The returned decision includes a
 /// deterministic next-available timestamp when the request can eventually fit.
-pub fn allow(bucket : TokenBucket, now_ms : Int, cost? : Int = 1) -> Decision {
+pub fn allow(bucket : TokenBucket, now_ms : Int64, cost? : Int = 1) -> Decision {
   decide(bucket, now_ms, cost, consume=true)
 }
 
@@ -168,7 +169,7 @@ pub fn allow(bucket : TokenBucket, now_ms : Int, cost? : Int = 1) -> Decision {
 fn validate_config(
   capacity : Int,
   refill_tokens : Int,
-  refill_period_ms : Int,
+  refill_period_ms : Int64,
 ) -> Unit raise ConfigError {
   if capacity <= 0 {
     raise NonPositiveCapacity(capacity)
@@ -184,7 +185,7 @@ fn validate_config(
 ///|
 fn decide(
   bucket : TokenBucket,
-  now_ms : Int,
+  now_ms : Int64,
   cost : Int,
   consume~ : Bool,
 ) -> Decision {
@@ -209,7 +210,8 @@ fn decide(
   } else {
     let missing = cost - current.tokens
     let ready_at = current.last_refill_ms +
-      ceil_div(missing, current.refill_tokens) * current.refill_period_ms
+      ceil_div(missing, current.refill_tokens).to_int64() *
+      current.refill_period_ms
     decision(
       false,
       current,
@@ -225,8 +227,8 @@ fn decision(
   allowed : Bool,
   bucket : TokenBucket,
   reason : DenialReason?,
-  next_available_ms : Int?,
-  delay_ms : Int,
+  next_available_ms : Int64?,
+  delay_ms : Int64,
 ) -> Decision {
   { allowed, bucket, reason, next_available_ms, delay_ms }
 }
@@ -235,7 +237,7 @@ fn decision(
 fn bucket_with(
   bucket : TokenBucket,
   tokens : Int,
-  last_refill_ms : Int,
+  last_refill_ms : Int64,
 ) -> TokenBucket {
   {
     capacity: bucket.capacity,
@@ -248,11 +250,15 @@ fn bucket_with(
 
 ///|
 fn ceil_div(value : Int, divisor : Int) -> Int {
-  (value + divisor - 1) / divisor
+  if value <= 0 {
+    0
+  } else {
+    (value - 1) / divisor + 1
+  }
 }
 
 ///|
-fn non_negative_delta(future : Int, now : Int) -> Int {
+fn non_negative_delta(future : Int64, now : Int64) -> Int64 {
   if future > now {
     future - now
   } else {

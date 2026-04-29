@@ -6,23 +6,23 @@ import {
 }
 
 // Values
-pub fn allow(TokenBucket, Int, cost? : Int) -> Decision
+pub fn allow(TokenBucket, Int64, cost? : Int) -> Decision
 
 pub fn available_tokens(TokenBucket) -> Int
 
 pub fn capacity(TokenBucket) -> Int
 
-pub fn check(TokenBucket, Int, cost? : Int) -> Decision
+pub fn check(TokenBucket, Int64, cost? : Int) -> Decision
 
-pub fn last_refill_ms(TokenBucket) -> Int
+pub fn last_refill_ms(TokenBucket) -> Int64
 
-pub fn new_token_bucket(Int, Int, Int, Int) -> TokenBucket raise ConfigError
+pub fn new_token_bucket(Int, Int, Int64, Int64) -> TokenBucket raise ConfigError
 
-pub fn new_token_bucket_with_tokens(Int, Int, Int, Int, Int) -> TokenBucket raise ConfigError
+pub fn new_token_bucket_with_tokens(Int, Int, Int64, Int64, Int) -> TokenBucket raise ConfigError
 
-pub fn refill(TokenBucket, Int) -> TokenBucket
+pub fn refill(TokenBucket, Int64) -> TokenBucket
 
-pub fn refill_period_ms(TokenBucket) -> Int
+pub fn refill_period_ms(TokenBucket) -> Int64
 
 pub fn refill_tokens(TokenBucket) -> Int
 
@@ -30,7 +30,7 @@ pub fn refill_tokens(TokenBucket) -> Int
 pub(all) suberror ConfigError {
   NonPositiveCapacity(Int)
   NonPositiveRefillTokens(Int)
-  NonPositiveRefillPeriod(Int)
+  NonPositiveRefillPeriod(Int64)
   InitialTokensOutOfRange(Int, Int)
 } derive(Eq, @debug.Debug)
 
@@ -39,8 +39,8 @@ pub(all) struct Decision {
   allowed : Bool
   bucket : TokenBucket
   reason : DenialReason?
-  next_available_ms : Int?
-  delay_ms : Int
+  next_available_ms : Int64?
+  delay_ms : Int64
 } derive(Eq, @debug.Debug)
 
 pub(all) enum DenialReason {
