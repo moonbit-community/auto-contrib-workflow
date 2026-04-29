@@ -1,0 +1,9 @@
+{
+  "name": "moonbit-community/rate_limit_policy",
+  "version": "0.1.0",
+  "readme": "README.mbt.md",
+  "repository": "https://github.com/Yoorkin/auto-contrib-workflow",
+  "license": "Apache-2.0",
+  "keywords": ["rate-limit", "token-bucket", "policy", "throttle"],
+  "description": "Deterministic rate limiting policies with caller-provided timestamps"
+}

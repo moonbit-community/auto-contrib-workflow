@@ -1,3 +1,5 @@
 members = [
   "form-urlencoded",
+  "rate-limit-policy",
+  "rate-limit-policy-crescent-example",
 ]
