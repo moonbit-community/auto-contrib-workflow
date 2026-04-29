@@ -177,6 +177,31 @@ test "large token counts compute delay without ceil overflow" {
 }
 
 ///|
+test "unrepresentable wait multiplication saturates next available time" {
+  let bucket = try! @rate_limit_policy.new_token_bucket_with_tokens(
+    2, 1, 9_223_372_036_854_775_000L, 0L, 0,
+  )
+  let decision = @rate_limit_policy.check(bucket, 0L, cost=2)
+  @debug.assert_eq(decision.allowed, false)
+  @debug.assert_eq(decision.reason, Some(InsufficientTokens(2)))
+  @debug.assert_eq(decision.next_available_ms, Some(9_223_372_036_854_775_807L))
+  @debug.assert_eq(decision.delay_ms, 9_223_372_036_854_775_807L)
+}
+
+///|
+test "unrepresentable ready timestamp addition saturates delay" {
+  let near_max_ms = 9_223_372_036_854_775_757L
+  let bucket = try! @rate_limit_policy.new_token_bucket_with_tokens(
+    1, 1, 100L, near_max_ms, 0,
+  )
+  let decision = @rate_limit_policy.check(bucket, near_max_ms)
+  @debug.assert_eq(decision.allowed, false)
+  @debug.assert_eq(decision.reason, Some(InsufficientTokens(1)))
+  @debug.assert_eq(decision.next_available_ms, Some(9_223_372_036_854_775_807L))
+  @debug.assert_eq(decision.delay_ms, 50L)
+}
+
+///|
 test "available tokens stay within bucket bounds across a timeline" {
   let mut bucket = try! @rate_limit_policy.new_token_bucket_with_tokens(
     5, 2, 100L, 0L, 0,

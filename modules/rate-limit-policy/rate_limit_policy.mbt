@@ -209,9 +209,11 @@ fn decide(
     decision(true, next_bucket, None, Some(now_ms), 0)
   } else {
     let missing = cost - current.tokens
-    let ready_at = current.last_refill_ms +
-      ceil_div(missing, current.refill_tokens).to_int64() *
-      current.refill_period_ms
+    let ready_at = saturating_ready_at(
+      current.last_refill_ms,
+      ceil_div(missing, current.refill_tokens),
+      current.refill_period_ms,
+    )
     decision(
       false,
       current,
@@ -258,10 +260,49 @@ fn ceil_div(value : Int, divisor : Int) -> Int {
 }
 
 ///|
+fn saturating_ready_at(
+  last_refill_ms : Int64,
+  periods_needed : Int,
+  refill_period_ms : Int64,
+) -> Int64 {
+  let max = max_int64()
+  let periods = periods_needed.to_int64()
+  if periods <= 0L {
+    last_refill_ms
+  } else if refill_period_ms > max / periods {
+    max
+  } else {
+    saturating_add_positive(last_refill_ms, periods * refill_period_ms)
+  }
+}
+
+///|
+fn saturating_add_positive(base : Int64, offset : Int64) -> Int64 {
+  let max = max_int64()
+  if offset <= 0L {
+    base
+  } else if base > max - offset {
+    max
+  } else {
+    base + offset
+  }
+}
+
+///|
 fn non_negative_delta(future : Int64, now : Int64) -> Int64 {
   if future > now {
-    future - now
+    let max = max_int64()
+    if now < 0L && future > max + now {
+      max
+    } else {
+      future - now
+    }
   } else {
     0
   }
+}
+
+///|
+fn max_int64() -> Int64 {
+  9_223_372_036_854_775_807L
 }
