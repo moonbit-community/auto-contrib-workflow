@@ -1,3 +1,4 @@
 members = [
+  "db-migration-lite",
   "form-urlencoded",
 ]
