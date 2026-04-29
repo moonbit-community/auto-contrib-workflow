@@ -23,7 +23,7 @@ test "discover migrations" {
       sql: "CREATE TABLE users(id INTEGER PRIMARY KEY);",
     },
   ]
-  let migrations = try! @db_migration_lite.discover(files)
+  let migrations = try! @db_migration_lite.Migration::discover(files)
   @debug.debug_inspect(
     migrations.map(migration => migration.version),
     content=(
@@ -36,7 +36,7 @@ test "discover migrations" {
 ```mbt check
 ///|
 test "plan pending migrations" {
-  let migrations = try! @db_migration_lite.discover([
+  let migrations = try! @db_migration_lite.Migration::discover([
     {
       path: "001_create_users.sql",
       sql: "CREATE TABLE users(id INTEGER PRIMARY KEY);",
@@ -47,7 +47,7 @@ test "plan pending migrations" {
     },
   ])
   let journal = @db_migration_lite.Journal::new().record_success(migrations[0])
-  let plan = try! @db_migration_lite.plan(migrations, journal)
+  let plan = try! journal.plan(migrations)
   @debug.debug_inspect(
     plan.pending.map(migration => migration.version),
     content=(
@@ -60,15 +60,14 @@ test "plan pending migrations" {
 ```mbt check
 ///|
 test "apply pending migrations" {
-  let migrations = try! @db_migration_lite.discover([
+  let migrations = try! @db_migration_lite.Migration::discover([
     {
       path: "001_create_users.sql",
       sql: "CREATE TABLE users(id INTEGER PRIMARY KEY);",
     },
   ])
-  let journal = try! @db_migration_lite.apply_pending(
+  let journal = try! @db_migration_lite.Journal::new().apply_pending(
     migrations,
-    @db_migration_lite.Journal::new(),
     _migration => Applied,
   )
   @debug.debug_inspect(

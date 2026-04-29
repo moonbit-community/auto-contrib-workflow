@@ -6,19 +6,6 @@ import {
 }
 
 // Values
-pub fn apply_pending(Array[Migration], Journal, (Migration) -> ApplyResult) -> Journal raise MigrationError
-
-pub fn discover(Array[MigrationFile]) -> Array[Migration] raise MigrationError
-
-pub fn journal_schema_sql() -> String
-
-pub let journal_table_name : String
-
-pub fn parse_file(MigrationFile) -> Migration raise MigrationError
-
-pub fn plan(Array[Migration], Journal) -> MigrationPlan raise MigrationError
-
-pub fn validate_ordered(Array[Migration]) -> Unit raise MigrationError
 
 // Errors
 pub(all) suberror MigrationError {
@@ -39,11 +26,15 @@ pub(all) enum ApplyResult {
 pub struct Journal {
   entries : Array[JournalEntry]
 } derive(Eq, @debug.Debug)
+pub fn Journal::apply_pending(Self, Array[Migration], (Migration) -> ApplyResult) -> Self raise MigrationError
 pub fn Journal::contains(Self, String) -> Bool
 pub fn Journal::entries(Self) -> Array[JournalEntry]
 pub fn Journal::from_entries(Array[JournalEntry]) -> Self raise MigrationError
 pub fn Journal::new() -> Self
+pub fn Journal::plan(Self, Array[Migration]) -> MigrationPlan raise MigrationError
 pub fn Journal::record_success(Self, Migration) -> Self
+pub fn Journal::schema_sql() -> String
+pub fn Journal::table_name() -> String
 
 pub(all) struct JournalEntry {
   version : String
@@ -57,11 +48,14 @@ pub(all) struct Migration {
   path : String
   sql : String
 } derive(Eq, @debug.Debug)
+pub fn Migration::discover(Array[MigrationFile]) -> Array[Self] raise MigrationError
+pub fn Migration::validate_ordered(Array[Self]) -> Unit raise MigrationError
 
 pub(all) struct MigrationFile {
   path : String
   sql : String
 } derive(Eq, @debug.Debug)
+pub fn MigrationFile::parse(Self) -> Migration raise MigrationError
 
 pub(all) struct MigrationPlan {
   applied : Array[Migration]

@@ -76,54 +76,43 @@ pub(all) suberror MigrationError {
 } derive(Eq, Debug)
 
 ///|
-/// Name of the default schema journal table.
-pub let journal_table_name : String = "moonbit_schema_migrations"
-
-///|
-/// SQL for creating the default schema journal table.
-///
-/// The statement does not interpolate migration data; callers should use their
-/// database adapter's parameter binding when inserting journal rows.
-pub fn journal_schema_sql() -> String {
-  "CREATE TABLE IF NOT EXISTS moonbit_schema_migrations (version TEXT PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);"
-}
-
-///|
 /// Parses one migration file.
 ///
 /// Supported file name forms are `<digits>_<name>.sql`,
 /// `<digits>__<name>.sql`, and `V<digits>__<name>.sql`.
-pub fn parse_file(file : MigrationFile) -> Migration raise MigrationError {
-  let base = base_name(file.path)
+pub fn MigrationFile::parse(
+  self : MigrationFile,
+) -> Migration raise MigrationError {
+  let base = base_name(self.path)
   if !base.has_suffix(".sql") {
-    raise InvalidFileName(file.path, "expected a .sql migration file")
+    raise InvalidFileName(self.path, "expected a .sql migration file")
   }
   let stem = string_from_view(base[:base.length() - 4])
-  let (version, name) = split_stem(stem, file.path)
-  validate_version(version, file.path)
-  validate_name(name, file.path)
-  { version, name, path: file.path, sql: file.sql }
+  let (version, name) = split_stem(stem, self.path)
+  validate_version(version, self.path)
+  validate_name(name, self.path)
+  { version, name, path: self.path, sql: self.sql }
 }
 
 ///|
 /// Parses, sorts, and validates migration files.
-pub fn discover(
+pub fn Migration::discover(
   files : Array[MigrationFile],
 ) -> Array[Migration] raise MigrationError {
   let migrations : Array[Migration] = []
   for file in files {
-    migrations.push(parse_file(file))
+    migrations.push(file.parse())
   }
   migrations
   .mut_view()
   .sort_by((left, right) => compare_versions(left.version, right.version))
-  validate_ordered(migrations)
+  Migration::validate_ordered(migrations)
   migrations
 }
 
 ///|
 /// Validates that migrations are in strict ascending version order.
-pub fn validate_ordered(
+pub fn Migration::validate_ordered(
   migrations : Array[Migration],
 ) -> Unit raise MigrationError {
   for index in 1..<migrations.length() {
@@ -142,6 +131,21 @@ pub fn validate_ordered(
 /// Creates an empty journal.
 pub fn Journal::new() -> Journal {
   { entries: [] }
+}
+
+///|
+/// Name of the default schema journal table.
+pub fn Journal::table_name() -> String {
+  "moonbit_schema_migrations"
+}
+
+///|
+/// SQL for creating the default schema journal table.
+///
+/// The statement does not interpolate migration data; callers should use their
+/// database adapter's parameter binding when inserting journal rows.
+pub fn Journal::schema_sql() -> String {
+  "CREATE TABLE IF NOT EXISTS moonbit_schema_migrations (version TEXT PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);"
 }
 
 ///|
@@ -188,16 +192,16 @@ pub fn Journal::record_success(
 
 ///|
 /// Builds a plan from ordered migrations and a journal.
-pub fn plan(
+pub fn Journal::plan(
+  self : Journal,
   migrations : Array[Migration],
-  journal : Journal,
 ) -> MigrationPlan raise MigrationError {
-  validate_ordered(migrations)
-  validate_journal_known(migrations, journal.entries)
+  Migration::validate_ordered(migrations)
+  validate_journal_known(migrations, self.entries)
   let applied : Array[Migration] = []
   let pending : Array[Migration] = []
   for migration in migrations {
-    if journal.contains(migration.version) {
+    if self.contains(migration.version) {
       applied.push(migration)
     } else {
       pending.push(migration)
@@ -213,13 +217,13 @@ pub fn plan(
 /// adapter. If it returns `Failed`, that migration is not recorded, later
 /// migrations are not attempted, and `ApplyFailed` exposes the journal with
 /// prior successful migrations.
-pub fn apply_pending(
+pub fn Journal::apply_pending(
+  self : Journal,
   migrations : Array[Migration],
-  journal : Journal,
   apply : (Migration) -> ApplyResult,
 ) -> Journal raise MigrationError {
-  let migration_plan = plan(migrations, journal)
-  let mut current = journal
+  let migration_plan = self.plan(migrations)
+  let mut current = self
   for migration in migration_plan.pending {
     match apply(migration) {
       Applied => current = current.record_success(migration)

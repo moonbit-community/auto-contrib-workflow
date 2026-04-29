@@ -14,7 +14,7 @@ fn entry(
 
 ///|
 test "discover parses fixtures and sorts by numeric version" {
-  let migrations = try! @db_migration_lite.discover([
+  let migrations = try! @db_migration_lite.Migration::discover([
     file(
       "migrations/010_add_email.sql", "ALTER TABLE users ADD COLUMN email TEXT;",
     ),
@@ -47,22 +47,20 @@ test "discover parses fixtures and sorts by numeric version" {
 
 ///|
 test "single underscore migration names may contain double underscores" {
-  let plain = try! @db_migration_lite.parse_file(
-    file("001_create__users.sql", "CREATE TABLE users(id INTEGER PRIMARY KEY);"),
-  )
+  let plain = try! file(
+    "001_create__users.sql", "CREATE TABLE users(id INTEGER PRIMARY KEY);",
+  ).parse()
   @debug.assert_eq((plain.version, plain.name), ("001", "create__users"))
-  let double_separator = try! @db_migration_lite.parse_file(
-    file("002__create_users.sql", "CREATE TABLE users(id INTEGER PRIMARY KEY);"),
-  )
+  let double_separator = try! file(
+    "002__create_users.sql", "CREATE TABLE users(id INTEGER PRIMARY KEY);",
+  ).parse()
   @debug.assert_eq(
     (double_separator.version, double_separator.name),
     ("002", "create_users"),
   )
-  let prefixed = try! @db_migration_lite.parse_file(
-    file(
-      "V003__create__posts.sql", "CREATE TABLE posts(id INTEGER PRIMARY KEY);",
-    ),
-  )
+  let prefixed = try! file(
+    "V003__create__posts.sql", "CREATE TABLE posts(id INTEGER PRIMARY KEY);",
+  ).parse()
   @debug.assert_eq((prefixed.version, prefixed.name), ("003", "create__posts"))
 }
 
@@ -71,7 +69,7 @@ test "invalid migration file names are rejected" {
   let missing_sql : Result[
     @db_migration_lite.Migration,
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.parse_file(file("001_create_users.txt", ""))
+  ] = try? file("001_create_users.txt", "").parse()
   @debug.assert_eq(
     missing_sql,
     Err(
@@ -81,7 +79,7 @@ test "invalid migration file names are rejected" {
   let missing_name : Result[
     @db_migration_lite.Migration,
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.parse_file(file("001_.sql", ""))
+  ] = try? file("001_.sql", "").parse()
   @debug.assert_eq(
     missing_name,
     Err(InvalidFileName("001_.sql", "expected a non-empty migration name")),
@@ -89,7 +87,7 @@ test "invalid migration file names are rejected" {
   let non_numeric : Result[
     @db_migration_lite.Migration,
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.parse_file(file("v1_create_users.sql", ""))
+  ] = try? file("v1_create_users.sql", "").parse()
   @debug.assert_eq(
     non_numeric,
     Err(InvalidFileName("v1_create_users.sql", "expected a numeric version")),
@@ -97,7 +95,7 @@ test "invalid migration file names are rejected" {
   let missing_double_version : Result[
     @db_migration_lite.Migration,
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.parse_file(file("__create_users.sql", ""))
+  ] = try? file("__create_users.sql", "").parse()
   @debug.assert_eq(
     missing_double_version,
     Err(
@@ -109,7 +107,7 @@ test "invalid migration file names are rejected" {
   let missing_v_version : Result[
     @db_migration_lite.Migration,
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.parse_file(file("V__create_users.sql", ""))
+  ] = try? file("V__create_users.sql", "").parse()
   @debug.assert_eq(
     missing_v_version,
     Err(
@@ -121,7 +119,7 @@ test "invalid migration file names are rejected" {
   let missing_v_double_separator : Result[
     @db_migration_lite.Migration,
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.parse_file(file("V001_create_users.sql", ""))
+  ] = try? file("V001_create_users.sql", "").parse()
   @debug.assert_eq(
     missing_v_double_separator,
     Err(InvalidFileName("V001_create_users.sql", "expected a numeric version")),
@@ -129,7 +127,7 @@ test "invalid migration file names are rejected" {
   let missing_single_version : Result[
     @db_migration_lite.Migration,
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.parse_file(file("_create_users.sql", ""))
+  ] = try? file("_create_users.sql", "").parse()
   @debug.assert_eq(
     missing_single_version,
     Err(
@@ -141,7 +139,7 @@ test "invalid migration file names are rejected" {
   let missing_separator : Result[
     @db_migration_lite.Migration,
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.parse_file(file("001.sql", ""))
+  ] = try? file("001.sql", "").parse()
   @debug.assert_eq(
     missing_separator,
     Err(
@@ -157,7 +155,7 @@ test "duplicate versions are rejected during discovery" {
   let result : Result[
     Array[@db_migration_lite.Migration],
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.discover([
+  ] = try? @db_migration_lite.Migration::discover([
     file("001_create_users.sql", ""),
     file("1_create_posts.sql", ""),
   ])
@@ -170,10 +168,10 @@ test "duplicate versions are rejected during discovery" {
 ///|
 test "validate_ordered rejects out of order migrations" {
   let migrations = [
-    try! @db_migration_lite.parse_file(file("002_second.sql", "")),
-    try! @db_migration_lite.parse_file(file("001_first.sql", "")),
+    try! file("002_second.sql", "").parse(),
+    try! file("001_first.sql", "").parse(),
   ]
-  let result : Result[Unit, @db_migration_lite.MigrationError] = try? @db_migration_lite.validate_ordered(
+  let result : Result[Unit, @db_migration_lite.MigrationError] = try? @db_migration_lite.Migration::validate_ordered(
     migrations,
   )
   @debug.assert_eq(result, Err(OutOfOrder("002", "001")))
@@ -181,7 +179,7 @@ test "validate_ordered rejects out of order migrations" {
 
 ///|
 test "plan separates applied and pending migrations" {
-  let migrations = try! @db_migration_lite.discover([
+  let migrations = try! @db_migration_lite.Migration::discover([
     file("001_create_users.sql", ""),
     file("002_add_email.sql", ""),
     file("003_add_posts.sql", ""),
@@ -190,7 +188,7 @@ test "plan separates applied and pending migrations" {
     entry("001", "create_users", "001_create_users.sql"),
     entry("002", "add_email", "002_add_email.sql"),
   ])
-  let migration_plan = try! @db_migration_lite.plan(migrations, journal)
+  let migration_plan = try! journal.plan(migrations)
   @debug.assert_eq(migration_plan.applied.map(migration => migration.version), [
     "001", "002",
   ])
@@ -209,7 +207,7 @@ test "journal rejects duplicates and unknown applied versions" {
     entry("1", "create_posts", "1_create_posts.sql"),
   ])
   @debug.assert_eq(duplicate, Err(DuplicateJournalVersion("1")))
-  let migrations = try! @db_migration_lite.discover([
+  let migrations = try! @db_migration_lite.Migration::discover([
     file("001_create_users.sql", ""),
   ])
   let journal = try! @db_migration_lite.Journal::from_entries([
@@ -218,26 +216,24 @@ test "journal rejects duplicates and unknown applied versions" {
   let unknown : Result[
     @db_migration_lite.MigrationPlan,
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.plan(migrations, journal)
+  ] = try? journal.plan(migrations)
   @debug.assert_eq(unknown, Err(UnknownAppliedVersion("002")))
 }
 
 ///|
 test "apply pending records successes and repeated apply is a no-op" {
-  let migrations = try! @db_migration_lite.discover([
+  let migrations = try! @db_migration_lite.Migration::discover([
     file("001_create_users.sql", ""),
     file("002_add_email.sql", ""),
   ])
-  let first = try! @db_migration_lite.apply_pending(
-    migrations,
-    @db_migration_lite.Journal::new(),
-    _migration => Applied,
-  )
+  let first = try! @db_migration_lite.Journal::new().apply_pending(migrations, _migration => {
+    Applied
+  })
   @debug.assert_eq(first.entries(), [
     entry("001", "create_users", "001_create_users.sql"),
     entry("002", "add_email", "002_add_email.sql"),
   ])
-  let second = try! @db_migration_lite.apply_pending(migrations, first, _migration => {
+  let second = try! first.apply_pending(migrations, _migration => {
     Failed("should not run")
   })
   @debug.assert_eq(second.entries(), [
@@ -250,7 +246,7 @@ test "apply pending records successes and repeated apply is a no-op" {
 
 ///|
 test "failed migration is not marked applied" {
-  let migrations = try! @db_migration_lite.discover([
+  let migrations = try! @db_migration_lite.Migration::discover([
     file("001_create_users.sql", ""),
     file("002_add_email.sql", ""),
   ])
@@ -258,18 +254,14 @@ test "failed migration is not marked applied" {
   let result : Result[
     @db_migration_lite.Journal,
     @db_migration_lite.MigrationError,
-  ] = try? @db_migration_lite.apply_pending(
-    migrations,
-    @db_migration_lite.Journal::new(),
-    migration => {
-      attempts += 1
-      if migration.version == "001" {
-        Applied
-      } else {
-        Failed("syntax error")
-      }
-    },
-  )
+  ] = try? @db_migration_lite.Journal::new().apply_pending(migrations, migration => {
+    attempts += 1
+    if migration.version == "001" {
+      Applied
+    } else {
+      Failed("syntax error")
+    }
+  })
   @debug.assert_eq(attempts, 2)
   match result {
     Err(ApplyFailed(version, reason, partial)) => {
@@ -279,7 +271,7 @@ test "failed migration is not marked applied" {
         entry("001", "create_users", "001_create_users.sql"),
       ])
       let retry_versions : Array[String] = []
-      let retry = try! @db_migration_lite.apply_pending(migrations, partial, migration => {
+      let retry = try! partial.apply_pending(migrations, migration => {
         retry_versions.push(migration.version)
         Applied
       })
@@ -296,10 +288,11 @@ test "failed migration is not marked applied" {
 ///|
 test "journal schema sql is stable" {
   @debug.assert_eq(
-    @db_migration_lite.journal_table_name, "moonbit_schema_migrations",
+    @db_migration_lite.Journal::table_name(),
+    "moonbit_schema_migrations",
   )
   @debug.assert_eq(
-    @db_migration_lite.journal_schema_sql(),
+    @db_migration_lite.Journal::schema_sql(),
     "CREATE TABLE IF NOT EXISTS moonbit_schema_migrations (version TEXT PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);",
   )
 }
