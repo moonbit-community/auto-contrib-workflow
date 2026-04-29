@@ -1,0 +1,59 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/rate_limit_policy"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn allow(TokenBucket, Int, cost? : Int) -> Decision
+
+pub fn available_tokens(TokenBucket) -> Int
+
+pub fn capacity(TokenBucket) -> Int
+
+pub fn check(TokenBucket, Int, cost? : Int) -> Decision
+
+pub fn last_refill_ms(TokenBucket) -> Int
+
+pub fn new_token_bucket(Int, Int, Int, Int) -> TokenBucket raise ConfigError
+
+pub fn new_token_bucket_with_tokens(Int, Int, Int, Int, Int) -> TokenBucket raise ConfigError
+
+pub fn refill(TokenBucket, Int) -> TokenBucket
+
+pub fn refill_period_ms(TokenBucket) -> Int
+
+pub fn refill_tokens(TokenBucket) -> Int
+
+// Errors
+pub(all) suberror ConfigError {
+  NonPositiveCapacity(Int)
+  NonPositiveRefillTokens(Int)
+  NonPositiveRefillPeriod(Int)
+  InitialTokensOutOfRange(Int, Int)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+pub(all) struct Decision {
+  allowed : Bool
+  bucket : TokenBucket
+  reason : DenialReason?
+  next_available_ms : Int?
+  delay_ms : Int
+} derive(Eq, @debug.Debug)
+
+pub(all) enum DenialReason {
+  InvalidCost(Int)
+  CostExceedsCapacity(Int, Int)
+  InsufficientTokens(Int)
+} derive(Eq, @debug.Debug)
+
+pub struct TokenBucket {
+  // private fields
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
+
