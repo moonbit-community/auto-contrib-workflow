@@ -46,6 +46,27 @@ test "discover parses fixtures and sorts by numeric version" {
 }
 
 ///|
+test "single underscore migration names may contain double underscores" {
+  let plain = try! @db_migration_lite.parse_file(
+    file("001_create__users.sql", "CREATE TABLE users(id INTEGER PRIMARY KEY);"),
+  )
+  @debug.assert_eq((plain.version, plain.name), ("001", "create__users"))
+  let double_separator = try! @db_migration_lite.parse_file(
+    file("002__create_users.sql", "CREATE TABLE users(id INTEGER PRIMARY KEY);"),
+  )
+  @debug.assert_eq(
+    (double_separator.version, double_separator.name),
+    ("002", "create_users"),
+  )
+  let prefixed = try! @db_migration_lite.parse_file(
+    file(
+      "V003__create__posts.sql", "CREATE TABLE posts(id INTEGER PRIMARY KEY);",
+    ),
+  )
+  @debug.assert_eq((prefixed.version, prefixed.name), ("003", "create__posts"))
+}
+
+///|
 test "invalid migration file names are rejected" {
   let missing_sql : Result[
     @db_migration_lite.Migration,
@@ -84,6 +105,26 @@ test "invalid migration file names are rejected" {
         "__create_users.sql", "expected a numeric version before __",
       ),
     ),
+  )
+  let missing_v_version : Result[
+    @db_migration_lite.Migration,
+    @db_migration_lite.MigrationError,
+  ] = try? @db_migration_lite.parse_file(file("V__create_users.sql", ""))
+  @debug.assert_eq(
+    missing_v_version,
+    Err(
+      InvalidFileName(
+        "V__create_users.sql", "expected a numeric version before __",
+      ),
+    ),
+  )
+  let missing_v_double_separator : Result[
+    @db_migration_lite.Migration,
+    @db_migration_lite.MigrationError,
+  ] = try? @db_migration_lite.parse_file(file("V001_create_users.sql", ""))
+  @debug.assert_eq(
+    missing_v_double_separator,
+    Err(InvalidFileName("V001_create_users.sql", "expected a numeric version")),
   )
   let missing_single_version : Result[
     @db_migration_lite.Migration,

@@ -234,31 +234,42 @@ fn split_stem(
   stem : String,
   path : String,
 ) -> (String, String) raise MigrationError {
-  match stem.find("__") {
-    Some(separator) => {
-      let version_start = if stem.has_prefix("V") { 1 } else { 0 }
-      if separator <= version_start {
-        raise InvalidFileName(path, "expected a numeric version before __")
+  if stem.has_prefix("V") {
+    match stem.find("__") {
+      Some(separator) => {
+        let version_start = 1
+        if separator <= version_start {
+          raise InvalidFileName(path, "expected a numeric version before __")
+        }
+        let version = string_from_view(stem[version_start:separator])
+        let name = string_from_view(stem[separator + 2:])
+        return (version, name)
       }
-      let version = string_from_view(stem[version_start:separator])
-      let name = string_from_view(stem[separator + 2:])
+      None => ()
+    }
+  }
+  match stem.find("_") {
+    Some(separator) => {
+      if separator == 0 {
+        if stem.has_prefix("__") {
+          raise InvalidFileName(path, "expected a numeric version before __")
+        }
+        raise InvalidFileName(path, "expected a numeric version before _")
+      }
+      let version = string_from_view(stem[:separator])
+      let name_start = if separator + 1 < stem.length() &&
+        string_from_view(stem[separator + 1:]).has_prefix("_") {
+        separator + 2
+      } else {
+        separator + 1
+      }
+      let name = string_from_view(stem[name_start:])
       (version, name)
     }
     None =>
-      match stem.find("_") {
-        Some(separator) => {
-          if separator == 0 {
-            raise InvalidFileName(path, "expected a numeric version before _")
-          }
-          let version = string_from_view(stem[:separator])
-          let name = string_from_view(stem[separator + 1:])
-          (version, name)
-        }
-        None =>
-          raise InvalidFileName(
-            path, "expected <version>_<name>.sql or V<version>__<name>.sql",
-          )
-      }
+      raise InvalidFileName(
+        path, "expected <version>_<name>.sql or V<version>__<name>.sql",
+      )
   }
 }
 
