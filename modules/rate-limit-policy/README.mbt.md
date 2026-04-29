@@ -62,38 +62,12 @@ framework, or async runtime. A runtime adapter should:
 - persist the returned bucket state in the caller's queue, map, or protected
   shared state.
 
-For a project that already uses `moonbitlang/async`, add `moonbitlang/async` to
-the consuming project and use `@async.now()` with `@async.sleep(...)`. `sleep`
-accepts `Int` milliseconds, so clamp the `Int64` delay before converting it:
-
-```mbt nocheck
-import {
-  "moonbitlang/async" @async
-  "moonbit-community/rate_limit_policy" @rate_limit_policy
-}
-
-fn sleep_delay_ms(delay_ms : Int64) -> Int {
-  if delay_ms <= 0L {
-    0
-  } else if delay_ms > 2_147_483_647L {
-    2_147_483_647
-  } else {
-    delay_ms.to_int()
-  }
-}
-
-async fn wait_for_slot(
-  bucket : @rate_limit_policy.TokenBucket
-) -> @rate_limit_policy.TokenBucket {
-  let decision = bucket.allow(@async.now())
-  if decision.allowed {
-    decision.bucket
-  } else {
-    @async.sleep(sleep_delay_ms(decision.delay_ms))
-    wait_for_slot(decision.bucket)
-  }
-}
-```
+For a project that already uses `moonbitlang/async`, use the runtime clock for
+`now_ms` and clamp `decision.delay_ms` before passing it to `@async.sleep`,
+which accepts `Int` milliseconds. The checked workspace module
+`moonbit-community/rate_limit_policy_crescent_example` includes this async
+adapter pattern so CI validates the code instead of relying on an unchecked
+README snippet.
 
 Keep synchronization outside this package. For example, async applications that
 share one bucket across tasks should protect the stored bucket with their own
