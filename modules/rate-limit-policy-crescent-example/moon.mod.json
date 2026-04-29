@@ -1,0 +1,15 @@
+{
+  "name": "moonbit-community/rate_limit_policy_crescent_example",
+  "version": "0.1.0",
+  "deps": {
+    "bobzhang/crescent": "0.10.0",
+    "moonbit-community/rate_limit_policy": "0.1.0",
+    "moonbitlang/async": "0.17.0"
+  },
+  "readme": "README.mbt.md",
+  "repository": "https://github.com/Yoorkin/auto-contrib-workflow",
+  "license": "Apache-2.0",
+  "keywords": ["rate-limit", "token-bucket", "crescent", "example"],
+  "description": "Checked Crescent integration example for rate_limit_policy",
+  "preferred-target": "native"
+}
